@@ -1,0 +1,15 @@
+#!/bin/bash
+
+cd ~/journal
+find -mindepth 2 -type f -name '.*.swp' -exec rm '{}' \;
+otherfiles=$(find -mindepth 2 -type f | grep -vE '.*/[0-9]{1,2}(-[[:alnum:]])?$')
+tmp=$(mktemp /tmp/jtmp.XXXXX)
+for entry in ${entries[@]} ; do
+    echo -e "\033[0;1;37m$(echo $entry | sed 's/^[^0-9]*//')\033[0m" >>$tmp
+    cat $entry | fold -w 80 -s >>$tmp
+    echo >>$tmp
+    echo >>$tmp
+done
+less -R $tmp
+rm $tmp
+exit

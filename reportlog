@@ -1,0 +1,44 @@
+#!/bin/sh
+
+if [ -z `mount | grep /mnt/sdb1` ] ; then
+    mount /dev/sdb1
+fi
+
+cd /media/usb/EPR
+
+year=`date +%Y`
+month=`date +%m`
+day=`date +%d`
+fname=EPR$year$month$day
+numentries=`echo * | wc -w`
+if [ -e $fname ] ; then
+    echo "You already have an entry for today."
+    echo "Do you want to (r)eplace it or write an (u)pdate?"
+    read ans
+    case $ans in
+        u|U)
+            fname=$fname-`echo $fname* | wc -w`
+            ;;
+        r|R)
+            rm $fname
+            ;;
+          *)
+            echo "Okay, whatever." ; exit 2
+            ;;
+    esac
+fi
+date +%H.%M > dt
+echo ----- >> dt
+echo  "Report no. $numentries" >> dt
+echo "Report no. $numentrie " | sed s/./=/g  >> dt
+touch $fname
+
+vim -c "read dt" -c "set wrap" -c 'startinsert' + $fname
+
+rm dt
+if [ ! -s $fname ] ; then
+    rm -v $fname
+fi
+if [ -e .$fname.swp ] ; then
+    rm -v .$fname.swp
+fi

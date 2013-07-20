@@ -1,0 +1,4 @@
+#!/bin/sh
+last_directory=$(cat .last-directory)
+cd $last_directory
+exec rxvt

@@ -1,0 +1,33 @@
+#!/bin/bash
+
+JOURNAL_DIR=$HOME/newsnotes
+
+while [ $# -gt 0 ]; do 
+    case $1 in
+        -r)
+            shift
+            readlist=${readlist:-$JOURNAL_DIR/*}
+            doread=true
+            ;;
+        -e)
+            shift
+            readlist=`grep -e $1 -l $JOURNAL_DIR/*`
+            shift
+            ;;
+        *)
+            url="$1"
+            shift
+            ;;
+    esac
+done
+if [ $doread ] ; then
+    cat $readlist | less
+    exit
+fi
+
+cd $JOURNAL_DIR
+
+fname=`date +%Y%m%d%H%M%S`
+timestamp=`date --rfc-3339=seconds`
+
+wget $url -O $fname

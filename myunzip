@@ -1,0 +1,8 @@
+#!/bin/bash
+echo -n >/tmp/myunziperror
+pwd >> /tmp/myunziperror
+exdir=`dirname "$1"`/`basename "$1" .zip`
+mkdir "$exdir"
+cd "$exdir"
+echo "$exdir" >> /tmp/myunziperror
+unzip "$1" 2>>/tmp/myunziperror

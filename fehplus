@@ -1,0 +1,2 @@
+#!/bin/bash
+feh -. -B black $@ 2>>/tmp/fehpluserror

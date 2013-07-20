@@ -1,0 +1,44 @@
+#!/bin/sh
+
+export MANSECT=1,3,7
+ASK_SECTION=false
+BG_COLOR=#000000 #solarized light gray
+FG_COLOR=#858900 #solarized green
+SEL_BG_COLOR=$FG_COLOR
+SEL_FG_COLOR=$BG_COLOR
+FONT="Sazanami Mincho:pixelsize=10"
+
+my_dmenu ()
+{
+    local prompt=${1:-"Man:"}
+    local height=${2:-4}
+    LANG=en_US.UTF-8 dmenu -p $prompt -nf $FG_COLOR -nb $BG_COLOR -sb $SEL_BG_COLOR -sf $SEL_FG_COLOR -i -fn "$FONT"
+}
+
+cachedir=${XDG_CACHE_HOME:-"$HOME/.cache"}
+if [ -d "$cachedir" ]; then
+	cache=$cachedir/dmenu_run
+else
+	cache=$HOME/.dmenu_cache # if no xdg dir, fall back to dotfile in ~
+fi
+IFS=:
+if stest -dqr -n "$cache" $PATH; then
+    page=`stest -flx $PATH | sort -u | tee "$cache" | my_dmenu "$@"`
+else
+    page=`my_dmenu "$@" < "$cache"`
+fi
+
+if [ ! $page ] ; then
+    exit
+fi
+
+multi=`apropos "^$page$"`
+if [ `echo $multi|wc -l` -gt 1 ] ; then
+    if [ $ASK_SECTION = true ] ; then
+        section=`echo $multi | egrep -o "\([[:digit:]]+\)" |egrep -o "[[:digit:]]" |my_dmenu Section:`
+    fi
+fi
+
+if [ $page ] ; then 
+    xterm -e "/usr/bin/man $section $page" &
+fi

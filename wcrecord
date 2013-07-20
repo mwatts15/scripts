@@ -1,0 +1,16 @@
+#!/bin/bash
+video=/tmp/`basename $0`-v
+killlist=/tmp/`basename $0`-$USER
+dnum=$1
+shift
+
+if [ ! -e $killlist ] ; then
+    echo $dev
+    ffmpeg $@ -f video4linux2 -s vga -i /dev/video$dnum  -sameq -r 30 -f mp4 $HOME/videos/`date +%Y-%m-%d-%H%M%s`_vid 2> ~/wcrecord-error.log &
+    echo $! > $killlist
+else
+    if [ -e /proc/`head -n 1 $killlist` ] ; then
+        kill `cat $killlist`
+    fi
+    rm $killlist
+fi

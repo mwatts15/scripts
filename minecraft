@@ -1,0 +1,3 @@
+#!/bin/sh
+cd $HOME/.minecraft
+java -jar Minecraft.jar

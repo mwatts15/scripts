@@ -1,0 +1,4 @@
+#!/bin/sh
+
+# -C so no corrections are done (Give us real words!)
+dict -C $(xsel)

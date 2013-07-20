@@ -1,0 +1,13 @@
+#!/usr/bin/env ruby
+
+require 'xmmsclient'
+
+xc = Xmms::Client.new("obxmms2")
+begin
+xc.connect(ENV["XMMS_PATH"])
+rescue
+    exit 1
+end
+while true
+  i = 2
+end

@@ -1,0 +1,15 @@
+#!/bin/bash
+WMIIR_PROMPT="wmiir> "
+
+while true ; do
+    echo -n "$WMIIR_PROMPT"
+    read -s -n 1 escape
+    case $escape in
+    \cL)
+        clear
+        continue
+    ;;
+    esac
+    read cmd
+    wmiir $cmd
+done

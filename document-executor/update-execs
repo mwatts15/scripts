@@ -1,0 +1,22 @@
+DOCUMENT_DIR=$HOME/documents
+# relative to DOCUMENT_DIR
+DOCUMENT_PATH=.:$HOME/oldhome/documents:$HOME/school
+EXECS_DIR=execs
+
+cd $DOCUMENT_DIR
+
+if [ ! -d $EXECS_DIR ] ; then mkdir $EXECS_DIR; fi
+
+
+WP_TMP=/tmp/docutmp-$$
+echo -n >$WP_TMP
+IFS=':'
+for dir in $DOCUMENT_PATH; do
+    find $dir \( -iname "*.pdf" -or -iname "*.txt" \) -type f -printf "%p\n" >>$WP_TMP
+done
+unset IFS
+
+cd $EXECS_DIR
+while read l; do
+    ./gen-exec \"$l\"" > "$EXECS_DIR/$(basename "$l")"
+done < $WP_TMP

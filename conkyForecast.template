@@ -1,0 +1,7 @@
+${voffset -10}${alignr 56}${color2}${font ConkyWeather:style=Bold:size=40}[--location=75098 --datatype=WF]${font}${color}
+${voffset -50}${color2}${font Weather:size=40}y${font}${color2}  ${voffset -38}${color2}${font Arial Black:size=26}[--location=75098 --datatype=HT]${font}${color}
+
+
+${voffset 0}${alignr 90}[--location=75098 --datatype=DW --startday=1 --shortweekday] ${alignr 65}[--location=75098 --datatype=DW --startday=2 --shortweekday] ${alignr 40}[--location=75098 --datatype=DW --startday=3 --shortweekday] ${alignr 20}[--location=75098 --datatype=DW --startday=4 --shortweekday]
+${voffset 0}${color2}${font ConkyWeather:size=28}[--location=75098 --datatype=WF --startday=1 --endday=4 --spaces=1]${font}${color}
+${voffset 0}${alignr 33}[--location=75098 --datatype=HT --startday=1 --hideunits --centeredwidth=3]/[--location=75098 --datatype=LT --startday=1 --hideunits --centeredwidth=3] ${alignr 25}[--location=75098 --datatype=HT --startday=2 --hideunits --centeredwidth=3]/[--location=75098 --datatype=LT --startday=2 --hideunits --centeredwidth=3] ${alignr 15}[--location=75098 --datatype=HT --startday=3 --hideunits --centeredwidth=3]/[--location=75098 --datatype=LT --startday=3 --hideunits --centeredwidth=3] ${alignr 10}[--location=75098 --datatype=HT --startday=4 --hideunits --centeredwidth=3]/[--location=75098 --datatype=LT --startday=4 --hideunits --centeredwidth=3]

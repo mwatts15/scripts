@@ -1,0 +1,13 @@
+#!/bin/sh
+
+preferred_dicts="wn gcide"
+tmp=`mktemp /tmp/dict-err.XXXX`
+dicts=$(echo "${preferred_dicts}" 2>$tmp | sed -r 's/[^ ]+/-d &/g')
+word=$(xsel | egrep -o '^\w+')
+defn=$(dict $dicts $word)
+if [ ! "$defn" ] ; then
+    correction=$(dmenu < $tmp)
+fi
+
+lines=$(echo -n "$defn" | wc -l)
+echo "$defn" | dmenu -l $lines

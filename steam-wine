@@ -1,0 +1,30 @@
+#!/bin/sh
+cd $HOME/.wine/drive_c/Program\ Files/Steam
+steam_binary=Steam.exe
+appid=0
+
+case $1 in
+hl2)
+    appid=220
+;;
+hl2e1)
+    appid=380
+;;
+hl2e2)
+    appid=420
+;;
+portal)
+    appid=400
+;;
+tf2)
+    appid=440
+;;
+*)
+    appid="noent"
+;;
+esac
+if [ appid != "noent" ]; then
+    wine $steam_binary -applaunch $appid -novid
+else
+    wine $steam_binary
+fi

@@ -1,0 +1,25 @@
+#!/usr/bin/env ruby
+
+require 'xmmsclient'
+require 'uri'
+
+$xc = Xmms::Client.new("xmms2attr")
+begin
+$xc.connect()
+rescue Xmms::Client::ClientError => e
+    $stderr.puts e
+    `xmms2-launcher`
+    ntries = 1
+    while $? != 0
+        if ntries > 4
+            exit "Can't start xmms2d. Exiting."
+        end
+        $stderr.puts "Coludn't start the daemon, trying again..."
+        sleep 3
+        `xmms2-launcher -vvvv`
+        ntries += 1
+    end
+    $stderr.puts "Connected."
+end
+$pl = $xc.playlist
+

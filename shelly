@@ -1,0 +1,15 @@
+#!/usr/bin/env ruby
+# shelly - the easy-shell maker
+# shelly <command>
+# command% subcommand options
+
+
+require 'readline'
+
+$command = ARGV.pop()
+
+input = ""
+
+while input = Readline.readline("#{$command}> ", true)
+    puts `#{$command} #{input}`
+end

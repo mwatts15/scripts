@@ -1,0 +1,61 @@
+#!/bin/sh
+
+IDEAS_DIR=$HOME/ideas
+
+while [ $# -gt 0 ]; do 
+    case $1 in
+        -r)
+            shift
+            readlist=${readlist:-$IDEAS_DIR/*}
+            doread=true
+            ;;
+        -e)
+            shift
+            readlist=`grep -e $1 -l $IDEAS_DIR/*`
+            shift
+            ;;
+        *)
+            title="$@"
+            break
+            ;;
+    esac
+done
+
+if [ $doread ] ; then
+    cat $readlist | less
+    exit
+fi
+
+cd $IDEAS_DIR
+
+timestamp=`date --rfc-3339=seconds`
+nideas=`ls -1 | wc -l`
+#title="$@"
+
+if [ -z "$title" ] ; then
+    echo "I need a title, kid."
+    exit 1
+fi
+date=`date +%Y%m%d%H%M%S`
+fname=`echo $nideas-$date-$title | sed -e "s/ /_/g"`
+
+echo "$title" | tr '[a-z]' '[A-Z]' | cat >dt
+echo "$title " | sed s/./-/g | cat >>dt
+echo >>dt
+echo >>dt
+echo --$USER >>dt
+echo $timestamp >>dt
+
+vim -c "read dt" -c "set wrap" -c 'startinsert' +/^$/ "$fname"
+rm dt
+
+if [ -e $fname ] ; then
+    fold -s $fname >tmp
+    mv tmp $fname
+else
+    echo Did not create ilog entry
+fi
+
+if [ -e .$fname.sw* ] ; then
+    rm -v .$fname.sw*
+fi

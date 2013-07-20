@@ -1,0 +1,51 @@
+#!/bin/sh
+
+cd ~/journal
+
+year=`date +%Y`
+month=`date +%m`
+day=`date +%d`
+
+if [ ! -e $year ] ; then
+    mkdir $year || exit 1
+fi
+cd $year
+
+if [ ! -e $month ] ; then
+    mkdir $month || exit 1
+fi
+cd $month
+
+if [ -e $day ] ; then
+    echo "You already have an entry for today."
+    echo "Do you want to (r)eplace it or write an (u)pdate?"
+    read ans
+    case $ans in
+        u|U)
+            day=$day-`echo $day* | wc -w`
+            ;;
+        r|R)
+            rm $day
+            ;;
+          *)
+            echo "Okay, whatever." ; exit 2
+            ;;
+    esac
+fi
+date +%H.%M | cat > "dt"
+for title
+do
+    echo $title | tr '[a-z]' '[A-Z]' | cat >> "dt"
+done
+echo "$title " | sed s/./-/g | cat >> "dt"
+touch $day
+
+vim -c "read dt" -c "set wrap" -c 'startinsert' + $day
+
+rm dt
+if [ ! -s $day ] ; then
+    rm -v $day
+fi
+if [ -e .$day.swp ] ; then
+    rm -v .$day.swp
+fi

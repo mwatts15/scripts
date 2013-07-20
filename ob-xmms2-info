@@ -1,0 +1,24 @@
+#!/usr/bin/perl
+
+print "<openbox_pipe_menu>";
+if (`xmms2 playlist config | egrep "^type: "` =~ /pshuffle$/)
+{
+    @lines = split /\n/, `xmms2 info 1`;
+}
+else
+{
+    @lines = split /\n/, `xmms2 info`;
+}
+foreach (@lines) {
+    $_ =~ s/^\[.+\] //;
+    $_ =~ s/ = / - /;
+    if (/^(artist|title|album|url|genre)/)
+    {
+        print "<item label=\"$_\">
+        <action name=\"Execute\">
+        <execute>xterm -e xmms2</execute>
+        </action>
+        </item>\n";
+    }
+}
+print "</openbox_pipe_menu>\n";

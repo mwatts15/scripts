@@ -1,0 +1,255 @@
+#!/usr/bin/perl 
+
+use feature qw/switch/;
+use File::Basename;
+use File::Copy;
+use strict;
+
+my $todo = "$ENV{HOME}/TODO";
+my $todo_dir = "$ENV{HOME}/.tood";
+my $todo_tmp = "/tmp/tood_TODO";
+my @todo_backups = sort {
+    ($b =~ /\.(\d+)$/)[0] <=> ($a =~ /\.(\d+)$/)[0]
+        ||
+        uc($a) cmp uc($b)
+} glob "$todo_dir/TODO.{[0-9],[0-9][0-9]}";
+my $todo_nbackups = 10;
+my $do_backup = 1;
+sub usage
+{
+    print "Usage: ", basename($0) , " <subcommand> [<arguments>]\n";
+    print "Subcommands\n";
+    print "\tshow\n";
+    print "\tadd <new_task>\n";
+    print "\tins <position> <new_task>\n";
+    print "\tmv <position> <new_position>\n";
+    print "\trep <position> <new_task>\n";
+    print "\ttail <position> <tail text>\n";
+    print "\trm <position>\n";
+    print "\tundo\n";
+}
+
+sub show
+{
+    if (! -z $todo)
+    {
+        open(TODO, '<', $todo);
+        my $line = 1;
+    
+        while(<TODO>)
+        {
+            #if ($line < 10)
+            #{
+                #print " ";
+            #}
+            printf "[%2d] $_", $line;
+            #print "[$line] $_";
+            $line++;
+        }
+    } 
+    else {
+        print "Nothing to do!\n";
+    }
+}
+
+sub add
+{
+    open(TODO, '>>', $todo);
+    if (@_ > 0) { print TODO join (" ", @_) . "\n";}
+    else 
+    { 
+        while (<STDIN>)
+        {
+            print TODO;
+        }
+    }
+    close(TODO);
+}
+
+sub insert
+{
+    my $pos = 0;
+    my @new_tasks = ();
+    if (@_ and $_[0] =~ /[0-9]+/)
+    {
+        ($pos, @new_tasks) = @_; 
+    }
+    else
+    {
+        $pos = 1;
+        @new_tasks = @_;
+    }
+    open(TODO, '<', $todo);
+    my @items = <TODO>;
+    close(TODO);
+    if ($pos > @items)
+    {
+        open(TODO, '>>', $todo);
+        foreach my $item (@new_tasks)
+        {
+            chomp $item;
+            print TODO "$item\n";
+        }
+        return;
+    }
+    #$pos > 0 or $pos = 1;
+    open(TODO, '>', $todo);
+    my $line_num = 1;
+    foreach my $item (@items)
+    {
+        if ($line_num == $pos)
+        {
+            foreach my $new_task (@new_tasks)
+            {
+                chomp $new_task;
+                print TODO "$item\n";
+            }
+        }
+        print TODO $item;
+        $line_num++;
+    }
+    close(TODO);
+}
+
+sub remove
+{
+    my @completed_tasks = @_;
+    open(TODO, '<', $todo);
+    my @items = <TODO>;
+    my @removed = ();
+    close(TODO);
+    open(TODO, '>', $todo);
+    my $line_num = 1;
+    # We can't remove entries directly because
+    # that destroys the structure/place of the
+    # list items
+    foreach my $item (@items)
+    {
+        # Instead, we go through the list of
+        # items and only print out the ones
+        # that aren't in our "completed_tasks"
+        # list
+        my $print_item = 1;
+        foreach (@completed_tasks)
+        {
+            if ($line_num == $_)
+            {
+               $print_item = 0;
+               push @removed, $item;
+               last; 
+            }
+        }
+        if ($print_item) 
+        { 
+            print TODO $item;
+        }
+        $line_num++;
+    }
+    close(TODO);
+    @removed;
+}
+
+sub make_tmp_TODO
+{
+    copy($todo, $todo_tmp);
+}
+
+sub unbackup_TODO
+{
+        copy("$todo_dir/TODO.0", $todo);
+        for (reverse @todo_backups)
+        {
+            m/\.([0-9]+)$/;
+            my $new_number = $1;
+            $new_number = ($new_number - 1);
+            ($new_number >= 0) and 
+                copy($_, "$todo_dir/TODO." . $new_number);
+        }
+}
+
+sub backup_TODO
+{
+    # rename the old ones
+    system("diff", $todo, $todo_tmp);
+    my $return  = $?;
+    if ($return && $do_backup)
+    {
+        for (@todo_backups)
+        {
+            m/\.([0-9]+)$/;
+            my $new_number = $1;
+            $new_number = ($new_number + 1);
+            ($new_number < $todo_nbackups) and 
+                copy($_, "$todo_dir/TODO." . $new_number);
+        }
+        copy($todo_tmp, "$todo_dir/TODO.0");
+    }
+}
+given (shift @ARGV)
+{
+    # save the current TODO file as .tood/TODO.#
+    # where # is the count of other such files +1
+    make_tmp_TODO();
+    when (/show|ls|list/)
+    {
+        show;
+        $do_backup = 0;
+    }
+    when ("add")
+    {
+        add(@ARGV);
+    }
+    when ("ins")
+    {
+        break;
+        insert(@ARGV);
+    }
+    when ("rm")
+    {
+        remove(@ARGV);
+    }
+    when ("mv")
+    {
+        break;
+        # TODO: allow multiple items to move
+        my @task_numbers = ();
+        while (scalar(@ARGV) > 1)
+        {
+            my $tmp = shift @ARGV;
+            push @task_numbers, $tmp;
+        }
+        my $destination = shift;
+        print "task_numbers = " . join(", ", @task_numbers) . "\n";
+        print "dest = $destination\n";
+        my @tasks = remove(@task_numbers);
+        insert($destination, @tasks);
+    }
+    when ("tail")
+    {
+        break;
+        # $task must be in parens because remove
+        # returns a list of removed items
+        chomp((my $task)= remove($ARGV[0]));
+        insert(shift, $task . " " . shift);
+    }
+    when ("rep")
+    {
+        break;
+        remove($ARGV[0]);
+        insert(@ARGV);
+    }
+    when ("undo")
+    {
+        unbackup_TODO();
+        $do_backup = 0;
+    }
+    default
+    {
+        usage;
+    }
+    # if the real TODO does not differ from
+    # the recently made backup, then just delete it
+}
+backup_TODO();
+
+# vim:set ft=perl

@@ -1,0 +1,132 @@
+#!/bin/bash
+##########################
+# simple xmms2 script    #
+# for dmenu              #
+##########################
+
+CONFIG=$HOME/.config/dxmms2
+# default configs
+# {{{
+TITLE_WIDTH=190
+BG_COLOR=#002b36
+FG_COLOR=#657b83
+SEL_BG_COLOR=$FG_COLOR
+SEL_FG_COLOR=$BG_COLOR
+FONT="Sazanami Mincho-8"
+# }}}
+
+if [ -e $CONFIG ] ; then
+    source $CONFIG
+fi
+
+cachedir=${XDG_CACHE_HOME:-"$HOME/.cache"}
+if [ -d "$cachedir" ]; then
+	searchcache=$cachedir/dxmms2_search
+else
+	searchcache=$HOME/.dxmms2_search_cache
+fi
+
+my_dmenu ()
+{
+    local prompt=${1:-">"}
+    local height=${2:-4}
+    LANG=en_US.UTF-8 dmenu -p $prompt -nf $FG_COLOR -nb $BG_COLOR -sb $SEL_BG_COLOR -sf $SEL_FG_COLOR -i -l $height -fn "$FONT"
+}
+
+decode_xmms2_url ()
+{
+    local url=$1
+    echo "$(perl -MURI::Escape -e 'print uri_unescape($ARGV[0]);' "$url")" 
+}
+
+my_printf=/usr/bin/printf
+
+commands="toggle list +fav prev next stop info change-playlist clear edit-metadata search"
+fields="artist album title"
+nfields="rating duration"
+
+pipe=/tmp/dxmms2-pipe
+if [ ! -e $pipe ] ; then
+    mkfifo $pipe
+fi
+
+while [ 1 ] ; do
+command=`echo ${commands} | sed "s/ /\n/g" | my_dmenu`
+case $command in
+    list)
+        # requires 
+        #  CLASSIC_LIST=true
+        #  CLASSIC_LIST_FORMAT=${artist}::${title}
+        # in .config/xmms2/clients/nycli.conf
+        morestring=--More--
+        backstring=--Back--
+        listoff=0
+        listing=1
+        while [ $listing -eq 1 ] ; do
+            current=`xmms2 list "-1" | egrep -o "\[([[:digit:]]+)/"|egrep -o "[[:digit:]]+"`
+            current=$((current + 1 + listoff))
+
+            xmms2 list $current-$((current + 15)) > $pipe &
+            disown
+            items=`cat $pipe | head -n -2 |
+              sed "s/^.\+] \(.*\)::\(.*\) (..:..) \?$/\1\x00\2\x00/; s/%/%%/" |
+              xargs --null $my_printf "%-70s%${TITLE_WIDTH}s" |
+              nl -v$((listoff+1)) -w2 -s ". "| head -n -1`
+            items="$items
+$backstring
+$morestring"
+            nitems=`echo "${items}" | wc -l`
+            pos=`echo "${items}" | my_dmenu "Track: " ${nitems} |
+            egrep -o "^[[:space:]]*-?[[:digit:]]+|$morestring|$backstring" |
+            sed -E 's/^[[:space:]]*(.*)[[:space:]]*$/\1/'`
+            if [ x$pos == x$morestring ] ;then
+                listoff=$((listoff + 15))
+            elif [ x$pos == x$backstring ] ;then
+                listoff=$((listoff - 15))
+            else
+                listing=0
+            fi
+        done
+        if [ ${pos} ] ; then
+            xmms2 jump `printf "%+d" $((pos - 1))`
+            echo $pos
+            xmms2 play
+        fi
+        break;;
+    info)
+        info=`xmms2 info | egrep -e "artist|title|album|tracknr|favorite|url"|
+        sed -E 's/^[^]]*\][[:space:]]*// ; s/ = /\n/'`
+        echo "$info" | zenity --height=300 --width=400 --title="XMMS2 Track Info" --list --text="Track info" --column "field" --column "value"
+        break;;
+    +fav)
+        id=`xmms2 info | grep "server.* id " | grep -o "[[:digit:]]*$"`
+        fav=`xmms2 info | grep "cli.* favorite " | grep -o "[[:digit:]]*$"`
+        fav=$((fav + 1))
+        xmms2 server property $id favorite $fav
+        break;;
+    add)
+        field=`echo "${fields} ${nfields}" | sed "s/ /\n/g" | my_dmenu`
+        my_dmenu < "$searchcache-$field"
+        break;;
+    change-playlist)
+        pls=`xmms2 playlist list`
+        nitems=`echo "$pls"|wc -l`
+        pl=`echo "$pls" | cut -c 3- | my_dmenu "Playlist: " ${nitems}`
+        xmms2 playlist switch $pl
+        break;;
+    update-cache)
+        for f in ${fields} ;do
+            xmms2 search -l $f +$f | tail -n +3 | head -n -1 | sed 's/^[[:space:]]*\|[[:space:]]*$//g' | uniq >$searchcache-$f
+        done
+        break;;
+    edit-metadata)
+        url="$(decode_xmms2_url "`xmms2 info | grep url | sed 's/.*=[[:space:]]// ; s%^file://%% ; s%+% %'g`")"
+        picard "$url"
+        break;;
+    *)
+        if [ $command ] ; then
+            xmms2 $command
+        fi
+        break;;
+esac
+done

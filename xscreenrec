@@ -1,0 +1,16 @@
+#!/bin/bash 
+if [ ! -e /tmp/$(basename $0)-$USER ] ; then
+    if [ ${1:-0} == '-r' ] ; then
+        info=`xwininfo -root`
+    else
+        info=`xwininfo $@`
+    fi
+    H=`echo "$info" | grep Height | sed -E "s/^.*: ([[:digit:]]+)$/\1/"`
+    W=`echo "$info" | grep Width | sed -E "s/^.*: ([[:digit:]]+)$/\1/"`
+    offset=:0.0+`echo "$info" | grep Corners | sed -E "s/^.*:[[:space:]]+\+([[:digit:]]+\+[[:digit:]]+)[[:space:]]+.+/\1/" | tr + ,`
+    ffmpeg -loglevel quiet -f x11grab -s ${W}x${H} -r 45 -i $offset -sameq -f mp4 ~/videos/`date +%Y-%m-%d-%H%M%s`_vid 2> $HOME/xscreenrec-error.log &
+    echo $! > /tmp/$(basename $0)-$USER
+else
+    kill $(cat /tmp/$(basename $0)-$USER)
+    rm /tmp/$(basename $0)-$USER
+fi

@@ -1,0 +1,7 @@
+#!/bin/sh
+
+output=`dmenu_run`
+
+if [ "$output" ] ; then
+    echo $output | dmenu
+fi

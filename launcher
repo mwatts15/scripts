@@ -1,0 +1,30 @@
+#!/bin/sh
+# {{{
+TITLE_WIDTH=190
+BG_COLOR=#000000
+FG_COLOR=#00bb52
+SEL_BG_COLOR=$FG_COLOR
+SEL_FG_COLOR=$BG_COLOR
+FONT="Sazanami Mincho-8"
+# }}}
+
+my_dmenu ()
+{
+    local prompt=${1:-">"}
+    local height=${2:-4}
+    LANG=en_US.UTF-8 dmenu -p $prompt -nf $FG_COLOR -nb $BG_COLOR -sb $SEL_BG_COLOR -sf $SEL_FG_COLOR -i -l $height -fn "$FONT"
+}
+commands="c x m"
+cmd=`echo ${commands} | sed "s/ /\n/g" | my_dmenu`
+
+case $cmd in
+    c)
+        dmenu_run -p Run -fn 'Sazanami Mincho':pixelsize=10
+        ;;
+    m)
+        dmenu_man
+        ;;
+    x)
+        dxmms2
+        ;;
+esac

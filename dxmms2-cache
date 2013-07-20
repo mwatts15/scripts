@@ -1,0 +1,1 @@
+xmms2 search -l $1 +$1 | tail -n +3 | head -n -1 | sed 's/^[[:space:]]*\|[[:space:]]*$//g' | uniq >dxmms2-cache-$1
