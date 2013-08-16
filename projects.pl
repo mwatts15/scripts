@@ -88,17 +88,21 @@ sub print_project_list
 {
     my @field_names = qw/Directory Remote/;
     my @fields = qw/dir remote/;
+    my $nfields = scalar(@fields);
     my @column_widths = (20, 30, 30);
     my $format_string = join(" ", map {"%-${_}s"} @column_widths) . "\n";
 
-    printf $format_string, "Name", @field_names;
     for my $pname (keys %project_hash)
     {
-        my @values = map {
-            my $v = $project_hash{$pname}{$_};
-            &desanitize_project_data($v)
-        } @fields;
-        printf $format_string, $pname, @values;
+        printf "=%s\n", $pname;
+        for my $i (0..($nfields-1))
+        {
+            my $v = $project_hash{$pname}{$fields[$i]};
+            if ($v)
+            {
+                printf "  %s:%s\n", $field_names[$i], &desanitize_project_data($v);
+            }
+        }
     }
 }
 
