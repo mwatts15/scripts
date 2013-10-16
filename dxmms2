@@ -181,12 +181,84 @@ def pl_list(start=nil,nentries=nil,prompt="Track: ")
     if pos < 0 then entries.length + pos else pos end
 end
 
+def xmms2_ids_to_display_list_strings(ids, fields=%w[artist title url duration])
+    ids.map do |id| 
+        my_info = extract_medialib_info(id, *fields)
+        artist_part = my_info[:artist]
+        some_title = (my_info[:title] or File.basename(my_info[:url]))
+        duration = my_info[:duration].to_i.ms_to_time_string
+        "#{artist_part}|||#{some_title} [#{duration}]"
+    end
+end
+
 def decode_xmms2_url (url)
     URI.decode_www_form_component(url)
     #echo "$(perl -MURI::Escape -e 'print uri_unescape($ARGV[0]);' "$url")" 
 end
 
-$commands=%w<toggle list +fav prev next stop info change-playlist clear edit-metadata search repeat-playlist repeat-track repeat-off remove shutdown>
+def get_usertags(id)
+    info = extract_medialib_info(id, :usertags)
+    if info.has_key?(:usertags)
+        info[:usertags].lines.to_a
+    else
+        []
+    end
+end
+
+def set_tags(id, tags)
+    $xc.medialib_entry_property_set(id, :usertags, tags.map{|x| x.chomp}.uniq.join("\n")).wait
+end
+
+def tag_track(id, tag)
+    tags = get_usertags(id) << tag.chomp
+    set_tags(id, tags)
+end
+
+def untag_track(id, tag)
+    tags = get_usertags(id).reject{|x|x==tag}
+    set_tags(id, tags)
+end
+
+def tag_menu(ids, previous_tags)
+    tag_file = File.join(Xmms::userconfdir, 'usertags')
+    all_tags = File.new(tag_file,File::CREAT).to_a
+
+    previous_tags = previous_tags.map{|x| x.chomp}
+
+    tag_list = previous_tags.map{|k| "!" + k} + all_tags
+    tag_list.map!{|x| x.chomp}
+
+    tag = my_dmenu(tag_list, "Add/delete a tag")
+    if (!tag.empty?)
+        Thread.new do 
+            if (tag[0] == "!")
+                ids.each do |id|
+                    untag_track(id, tag[1..-1])
+                end
+            else
+                ids.each do |id|
+                    tag_track(id, tag)
+                end
+            end
+        end
+
+
+        if (tag[0] != "!")
+            all_tags << tag + "\n"
+            all_tags.uniq!
+        end
+        File.open(tag_file, "w") do |file|
+            all_tags.each do |t|
+                file.write(t)
+            end
+        end
+        tag
+    else
+        nil
+    end
+end
+
+$commands=%w<toggle list +fav tag prev next stop info change-playlist clear edit-metadata search repeat-playlist repeat-track repeat-off remove shutdown>
 
 $xc = Xmms::Client.new("dxmms2")
 begin
@@ -233,13 +305,15 @@ while (true) do
         if not entries.nil?
             pos = pl_list(nil,nil,"Track Info:")
             id = entries[pos]
-            info = extract_medialib_info(id, *%w<artist title album tracknr favorite timesplayed url date duration laststarted added>)
+            info = extract_medialib_info(id, *%w<artist title album tracknr favorite timesplayed url date duration laststarted added usertags>)
             info = Hash[info.map { |k,v| 
                 k = k.to_s
                 if %w<duration>.include?(k) 
                     v = [v.to_i.ms_to_time_string, v]
                 elsif %w<laststarted added lmod>.include?(k)
                     v = [Time.at(v.to_i).strftime("%F"), v]
+                elsif k == "usertags"
+                    v = [v.gsub(%r{\n}, ", ")]
                 else
                     v = [v]
                 end
@@ -294,6 +368,36 @@ while (true) do
         id = $xc.playback_current_id.wait.value
         old_favorite = extract_medialib_info(id, :favorite)[:favorite].to_i
         $xc.medialib_entry_property_set(id, :favorite, old_favorite+1).wait
+        break
+    when "tag"
+        # TODO: refcount the tags in the tag file so they get removed
+        # when no file is tagged with them
+
+        id = $xc.playback_current_id.wait.value
+        while tag_menu([id], get_usertags(id))
+        end
+
+        break
+    when "tag-album"
+        begin
+        id = $xc.playback_current_id.wait.value
+
+        album_name = extract_medialib_info(id, :album)[:album]
+        album_coll = Xmms::Collection.new(Xmms::Collection::TYPE_MATCH)
+
+        album_coll.operands << Xmms::Collection.universe
+        album_coll.attributes["field"] = "album"
+        album_coll.attributes["value"] = album_name
+
+        album_ids = $xc.coll_query_ids(album_coll).wait.value
+        puts album_name
+        puts album_ids
+        while tag_menu(album_ids, [])
+        end
+        catch e
+            puts e
+        end
+
         break
     when "change-playlist"
         playlists = $xc.playlist_list.wait.value

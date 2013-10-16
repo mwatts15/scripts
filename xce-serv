@@ -66,6 +66,7 @@ $fn_syms = {
         [:f_timesplayed, %w(played timesplayed), "timesplayed"],
         [:f_url, %w(url uri), "url"],
         [:f_genre, %w(gen genre), "genre"],
+        [:f_usertags, %w(usertags utags), "usertags"],
         [:f_date, %w(dt yr date year), "date"]],
     :cmd =>
     [[:c_clear_stack, %w(cl)],
