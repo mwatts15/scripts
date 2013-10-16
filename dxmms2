@@ -7,7 +7,7 @@ require 'socket'
 # for dmenu              #
 ##########################
 
-#$CONFIG = File.join(Dir.home + ".config/dxmms2")
+$COMMAND_SIG = "@"
 # default configs {{{
 $SCREEN_WIDTH=600
 $FONT_WIDTH=14 #in pixels
@@ -69,8 +69,8 @@ class String
 end
 
 def my_dmenu (entries, prompt='dxmms2', height=entries.count, width=$SCREEN_WIDTH)
-#width=$SCREEN_WIDTH
     res = ""
+    height = [height, 20].min
     entries.collect! do |line|
         l, r = line.split("|||")
         #puts "width=" + width.to_s
@@ -88,7 +88,6 @@ def my_dmenu (entries, prompt='dxmms2', height=entries.count, width=$SCREEN_WIDT
         io.close_write
         res = io.gets
     end
-    printf "res = #{res}\n"
     res.to_s.chomp
 end
 
@@ -112,10 +111,8 @@ def extract_medialib_info(id, *fields)
 end
 
 def pl_list(start=nil,nentries=nil,prompt="Track: ")
-    morestring="--More--"
-    endstring="--End--"
-    startstring="--Start--"
-    backstring="--Back--"
+    morestring,endstring,startstring,backstring = 
+        %w[more end start back].map{|w| $COMMAND_SIG + w}
     listing=1
     nentries = (nentries.nil? ? $LIST_ENTRIES_PER_PAGE : nentries)
     pos = nil
@@ -145,13 +142,10 @@ def pl_list(start=nil,nentries=nil,prompt="Track: ")
             items << startstring
         end
 
-        entries[list_start..list_end].each do |id| 
-            my_info = extract_medialib_info(id, "artist", "title", "url", "duration")
-            artist_part = "#{i.to_s.rjust(nw)}. #{my_info[:artist]}"
-            some_title = (my_info[:title] or File.basename(my_info[:url]))
-            duration = my_info[:duration].to_i.ms_to_time_string
-            items << "#{artist_part}|||#{some_title} [#{duration}]"
+        items += xmms2_ids_to_display_list_strings(entries[list_start..list_end]).map do |string|
+            string = "#{i.to_s.rjust(nw)}. #{string}"
             i += 1
+            string
         end
 
         if not end_clamped
@@ -276,6 +270,7 @@ rescue Xmms::Client::ClientError => e
         `xmms2-launcher -vvvv`
         ntries += 1
     end
+    $xc.connect()
     $stderr.puts "Connected."
 end
 $pl = $xc.playlist
@@ -286,10 +281,6 @@ while (true) do
         # NOTE: The *break statements* in here are for the *while loop*
         #       not for the switch
     when "list"
-        # requires 
-        #  CLASSIC_LIST=true
-        #  CLASSIC_LIST_FORMAT=${artist}::${title}
-        # in .config/xmms2/clients/nycli.conf
         pos = pl_list(nil, nil, "Play Track:")
         if not pos.nil?
             puts "moving to positon #{pos}"
@@ -321,21 +312,25 @@ while (true) do
             }]
             while true
                 field = my_dmenu(info.map {|k,v| "#{k} |||#{v[0]}"}, "Info", info.size)
-                field = field[/^[^ ]+/]
-                values = info[field]
-                if values.length > 1
-                    value = my_dmenu(values.map{ |v| v.to_s }, "Version?")
-                else
-                    value = values[0]
-                end
-                operation = my_dmenu(%w<copy back>, value) 
-                case operation
-                when "copy"
-                    `echo '#{value}' | xsel -i`
+                if field.empty?
                     break
-                when "back"
                 else
-                    break
+                    field = field[/^[^ ]+/]
+                    values = info[field]
+                    if values.length > 1
+                        value = my_dmenu(values.map{ |v| v.to_s }, "Version?")
+                    else
+                        value = values[0]
+                    end
+                    operation = my_dmenu(%w<copy back>, value) 
+                    case operation
+                    when "copy"
+                        `echo '#{value}' | xsel --clipboard -i`
+                        break
+                    when "back"
+                    else
+                        break
+                    end
                 end
             end
         end
