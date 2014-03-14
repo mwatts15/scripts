@@ -1,4 +1,52 @@
-#!/bin/sh
+#!/usr/bin/env ruby
+require 'open3'
+require 'stringio'
+require 'dmenu_util'
 
-# -C so no corrections are done (Give us real words!)
-dict -C $(xsel)
+# dict lookup selected
+
+# TODO: support multiple definitions from a single source
+
+selection = `xsel`
+selection.gsub!(/[^a-zA-Z]/, '')
+
+cmd = "dict -f #{selection}"
+
+def parse_dict_formatted_output(line)
+    line.split("\t")
+end
+
+Open3.popen3(cmd) do |stdin, stdout, stderr, wait_thr|
+    exit_status = wait_thr.value.to_i % 255
+    puts "es is #{exit_status}"
+    if exit_status == 1
+        puts "bad match: '#{selection}'"
+    elsif exit_status == 20
+        puts "no matches found: '#{selection}'"
+    elsif exit_status == 21
+        # skip over the notice
+        stderr.gets
+        while line = stderr.gets
+            puts line
+        end
+    elsif exit_status == 0
+        puts "matched"
+        # skip over the notice
+        stdout.gets
+        options = Hash.new
+        while line = stdout.gets
+            if line[0] != ' '
+                (_,_,short_name,long_name) = parse_dict_formatted_output(line)
+                desc = StringIO.new
+                line = stdout.gets
+                while /^\s/ =~ line
+                    desc << line
+                    line = stdout.gets
+                end
+                options[short_name] = [long_name, desc.string]
+            end
+        end
+        choice = my_dmenu(options.keys)
+        my_dmenu(options[choice][1].split("\n"), "definition for #{selection}")
+    end
+end
