@@ -10,4 +10,4 @@ if [ ! "$defn" ] ; then
 fi
 
 lines=$(echo -n "$defn" | wc -l)
-echo "$defn" | dmenu -l $lines
+echo "$defn" | zenity --text-info
