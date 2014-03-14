@@ -1,0 +1,68 @@
+#!/usr/bin/env python
+
+import sqlite3
+import time
+import sys
+from os import environ
+try:
+    sys.setappdefaultencoding('utf-8')
+except:
+    sys = reload(sys)
+    sys.setdefaultencoding('utf-8')
+
+def connectToDB():
+    tdb = TagDB(environ['HOME'] + '/.mozilla/firefox/mwad0hks.default/places.sqlite')
+    return tdb
+
+class TagDB:
+    def __init__(self, db_name):
+        self.conn = sqlite3.connect(db_name)
+        self.c = self.conn.cursor()
+        self.c.execute("PRAGMA foreign_keys=ON")
+
+    def extract_tags(self):
+        query = """
+select q.url,a.title
+from moz_bookmarks a, moz_bookmarks b, moz_places q
+where
+a.parent = 4
+and b.parent=a.id
+and b.fk = q.id
+group by a.title,q.url
+order by q.url;
+"""
+        self.c.execute(query)
+        return self.c.fetchall()
+
+    def extract_titles(self):
+        query = """
+select q.url,q.title
+from moz_bookmarks a, moz_places q
+where
+(a.parent == 2
+or a.parent == 3
+or a.parent == 5)
+and
+a.fk = q.id
+order by q.url;
+"""
+        self.c.execute(query)
+        return self.c.fetchall()
+
+db = connectToDB()
+titlos = db.extract_titles()
+tags = db.extract_tags()
+f = {}
+for r in titlos:
+    f[r[0]] = {}
+    f[r[0]]['title'] = r[1]
+for r in tags:
+    if not ('tags' in f[r[0]]):
+        f[r[0]]['tags'] = []
+    f[r[0]]['tags'].append(r[1])
+
+for r in f:
+    print unicode(r) + "|" + unicode(f[r]['title']) + "|",
+    if 'tags' in f[r]:
+        print ','.join(f[r]['tags']),
+    print
