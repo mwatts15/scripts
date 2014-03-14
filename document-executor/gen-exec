@@ -1,3 +1,0 @@
-if [ -f "$1" ] ; then exit; fi
-echo "gnome-open \"$1\"" > "$1"
-chmod +x "$1"
