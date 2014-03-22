@@ -1,1 +1,3 @@
-racket -i -l prelude -l readline -l readline/pread -e '(current-prompt #"% ")'
+#!/bin/sh
+
+racket -i -l prelude -l xrepl $@

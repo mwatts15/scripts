@@ -2,7 +2,9 @@
 
 if [ $1 ] ; then
     dir=$1
+    shift
 else
     dir='.'
 fi
-/usr/bin/du --all -k -d 1 $dir | sort -nr | /usr/bin/perl $HOME/bin/human_bytes.pl
+
+/usr/bin/du --all -k -x -d 1 $dir $@ | sort -nr | /usr/bin/perl $HOME/bin/human_bytes.pl
