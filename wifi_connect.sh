@@ -11,7 +11,7 @@ WC_CACHE=~/.wifi_connect_list
 message ()
 {
     kill $MESSAGE_PID 2>/dev/null
-    zenity --info --timeout=2 --text="${@}" 2>/dev/null
+    twmnc --duration 2000 --title NetworkManager --content "${@}" 2>/dev/null
     MESSAGE_PID=$!
 }
 
