@@ -130,7 +130,7 @@ sub print_zsh_alias_commands
         my $dir = &desanitize_project_data($project_hash{$pname}{"dir"});
         print FH "alias go$printed_name=\"cd $dir\"\n";
         print FH "alias ls$printed_name=\"ls $dir\"\n";
-        print FH "alias put$printed_name=\"cp -t $dir\"\n";
+        print FH "alias put$printed_name=\"cp -r -t $dir\"\n";
     }
 
     for my $pname (@unalias_list)

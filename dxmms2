@@ -252,7 +252,18 @@ def tag_menu(ids, previous_tags)
     end
 end
 
-$commands=%w<toggle list +fav tag prev next stop info change-playlist clear edit-metadata search repeat-playlist repeat-track repeat-off remove shutdown>
+def get_album_ids(id)
+    album_name = extract_medialib_info(id, :album)[:album]
+    album_coll = Xmms::Collection.new(Xmms::Collection::TYPE_MATCH)
+
+    album_coll.operands << Xmms::Collection.universe
+    album_coll.attributes["field"] = "album"
+    album_coll.attributes["value"] = album_name
+
+    $xc.coll_query_ids(album_coll).wait.value
+end
+
+$commands=%w<toggle list +fav +fav-album tag tag-album prev next stop info change-playlist clear edit-metadata search shuffle repeat-playlist repeat-track repeat-off remove shutdown>
 
 $xc = Xmms::Client.new("dxmms2")
 begin
@@ -296,7 +307,7 @@ while (true) do
         if not entries.nil?
             pos = pl_list(nil,nil,"Track Info:")
             id = entries[pos]
-            info = extract_medialib_info(id, *%w<artist title album tracknr favorite timesplayed url date duration laststarted added usertags>)
+            info = extract_medialib_info(id, *%w<artist title album tracknr favorite timesplayed url date duration laststarted added usertags comment>)
             info = Hash[info.map { |k,v| 
                 k = k.to_s
                 if %w<duration>.include?(k) 
@@ -356,13 +367,26 @@ while (true) do
         end
         break
     when "remove"
-        pos = pl_list(nil,nil,"Remove entry:")
-        $pl.remove_entry(pos).wait
+        while true
+            pos = pl_list(nil,nil,"Remove entry:")
+            if pos.nil?
+                break
+            else
+                $pl.remove_entry(pos).wait
+            end
+        end
         break
     when "+fav"
         id = $xc.playback_current_id.wait.value
         old_favorite = extract_medialib_info(id, :favorite)[:favorite].to_i
         $xc.medialib_entry_property_set(id, :favorite, old_favorite+1).wait
+        break
+    when "+fav-album"
+        id = $xc.playback_current_id.wait.value
+        get_album_ids(id).each do |al_id|
+            old_favorite = extract_medialib_info(al_id, :favorite)[:favorite].to_i
+            $xc.medialib_entry_property_set(al_id, :favorite, old_favorite+1).wait
+        end
         break
     when "tag"
         # TODO: refcount the tags in the tag file so they get removed
@@ -375,20 +399,9 @@ while (true) do
         break
     when "tag-album"
         begin
-        id = $xc.playback_current_id.wait.value
-
-        album_name = extract_medialib_info(id, :album)[:album]
-        album_coll = Xmms::Collection.new(Xmms::Collection::TYPE_MATCH)
-
-        album_coll.operands << Xmms::Collection.universe
-        album_coll.attributes["field"] = "album"
-        album_coll.attributes["value"] = album_name
-
-        album_ids = $xc.coll_query_ids(album_coll).wait.value
-        puts album_name
-        puts album_ids
-        while tag_menu(album_ids, [])
-        end
+            album_ids = get_album_ids(id)
+            while tag_menu(album_ids, [])
+            end
         catch e
             puts e
         end
@@ -413,8 +426,24 @@ while (true) do
             `xmms2 server config playlist.repeat_all 1`
         end
         break
+    when "shuffle"
+        $pl.shuffle.wait
+        break
     when "shutdown"
         `xmms2 server shutdown`
+        break
+    when "seek"
+        id = $xc.playback_current_id.wait.value
+        info = extract_medialib_info(id, :duration)
+        dur = info[:duration].to_i 
+        interval_size = dur / 10
+        times = []
+        times << ["start",  0]
+        Range.new(0,dur).step(interval_size).each do |x|
+            times << [x.ms_to_time_string, x]
+        end
+        times << ["end", dur]
+        seek_location = my_dmenu(times.map{|x| x[0]})
         break
     else
         if not command.empty?
