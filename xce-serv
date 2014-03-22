@@ -6,12 +6,11 @@ require 'socket'
 # An xmms2 collection editor/viewer #
 # tool based on reverse-polish      #
 # notation calculators              #
-#       (c) Mark W. 2012            #
+#       (c) Mark W. 2014            #
 #-----------------------------------#
-# Set this to true if you wan't
+# Set this to true if you want
 # functions to be curried rather
 # than just raising NotEnoughArguments
-$DO_CURRYING = false
 $SOCKET_PATH = "/tmp/#{ENV["USER"]}-xce-ipc-socket"
 
 $FILE_LOCK = "#{Xmms::userconfdir}/xce.lock"
@@ -41,8 +40,6 @@ end
 
 $empty_sym = [:empty, ['~']]
 
-$classes = [:op, :quant]
-
 $fn_syms = { 
     :op =>
     [[:op_and, %w(a and), Xmms::Collection::TYPE_INTERSECTION],
@@ -50,6 +47,9 @@ $fn_syms = {
         [:op_andn, %w(an andn), Xmms::Collection::TYPE_INTERSECTION],
         [:op_orn, %w(on orn), Xmms::Collection::TYPE_UNION],
         [:op_not, %w(n not), Xmms::Collection::TYPE_COMPLEMENT]],
+    :agg =>
+    [[:agg_sum, %w(sum), "sum"],
+        ],
     :quant => 
     [[:q_gt, %w(> gt), Xmms::Collection::TYPE_GREATER],
         [:q_lt, %w(< lt), Xmms::Collection::TYPE_SMALLER],
@@ -57,6 +57,7 @@ $fn_syms = {
         [:q_has, %w(has), Xmms::Collection::TYPE_HAS],
         [:q_le, %w(<= le), Xmms::Collection::TYPE_SMALLEREQ],
         [:q_match, %w(m match), Xmms::Collection::TYPE_MATCH],
+        [:q_ref, %w(in), Xmms::Collection::TYPE_REFERENCE],
         [:q_eq, %w(= eq), Xmms::Collection::TYPE_EQUALS]],
     :field =>
     [[:f_artist, %w(ar artist), "artist"],
@@ -76,13 +77,13 @@ $fn_syms = {
         [:c_rotate, %w(rot dig)],
         [:c_dup, %w(dup)],
         [:c_add_to_playlist, %w(addp)],
+        [:c_clear_playlist, %w(clp)],
         [:c_print_head, %w(p)],
         [:c_print_stack, %w(ps)],
         [:c_save_coll, %w(save)],
         [:c_save_playlist, %w(savep)],
         [:c_reload, %w(rl)],
-        [:c_print_coll, %w(pc)],
-        [:c_dump_coll, %w(dc)]],
+        [:c_print_coll, %w(pc)]],
     :math =>
     [[:m_plus, %w(+), :+],
         [:m_minus, %w(-), :-],
@@ -173,6 +174,7 @@ module Function
     class UnknownFunction < Exception
         def initialize(token)
             msg = "No function for token: #{token}"
+            $stderr.write(construct_tlv("err", msg))
             super msg
         end
     end
@@ -186,6 +188,8 @@ module Function
             CmpCollection.new($coll_types[token])
         when *$fn_syms[:op].transpose[0]
             BoolCollection.new($coll_types[token])
+        when *$fn_syms[:agg].transpose[0]
+            Aggregation.new($coll_types[token])
         when *$fn_syms[:math].transpose[0]
             MathOperation.new($coll_types[token])
         when :co_car
@@ -210,14 +214,14 @@ module Function
             Swap.new
         when :c_add_to_playlist
             AddToPlaylist.new
+        when :c_clear_playlist
+            ClearPlaylist.new
         when :c_print_head
             PrintHead.new
         when :c_print_stack
             PrintStack.new
         when :c_print_coll
             PrintColl.new
-        when :c_dump_coll
-            DumpColl.new
         when :c_save_coll
             SaveCollection.new
         when :c_reload
@@ -263,14 +267,11 @@ end
 class FieldSpec
     include Function
     include Listable
-    # specifies a field and a value for that field
-    # becomes the argument for a quantifier type
-    # collection
+    # specifies a field and a value associated with it
+    # becomes the argument for a quantifier type or for an aggregation
     def initialize(field)
         @field = field
         @value = nil
-        # This is returned if we received a list of 
-        # values as our argument
     end
     def push (value)
         if value.is_a?(Array)
@@ -313,6 +314,7 @@ end
 class Collection < Xmms::Collection
     def initialize (type)
         super(type)
+        @type = type
     end
 end
 
@@ -334,13 +336,20 @@ class CmpCollection < CollectionFunc
         self.operands << Collection.universe
     end
     def push (o)
-        if (o.is_a?(FieldSpec))
-            self.attributes["field"] = o.field
-            self.attributes["value"] = o.value.to_s # xmms2 won't convert for us :<
-        elsif (o.is_a?(Array))
-            @list = o.collect{|x| CmpCollection.new(self.type).push(x)}
+        if @type == Xmms::Collection::TYPE_REFERENCE
+            self.attributes["reference"] = o
+            self.attributes["namespace"] = "Collections"
         else
-            raise WrongType.new(o.class, self)
+            if (o.is_a?(FieldSpec))
+                self.attributes["field"] = o.field
+                self.attributes["value"] = o.value.to_s # xmms2 won't convert for us :<
+            elsif (o.is_a?(String))
+                self.attributes["field"] = o
+            elsif (o.is_a?(Array))
+                @list = o.collect{|x| CmpCollection.new(@type).push(x)}
+            else
+                raise WrongType.new(o.class, self)
+            end
         end
         self
     end
@@ -349,13 +358,30 @@ class CmpCollection < CollectionFunc
     end
     def return
         if @list.nil?
-            if attributes["field"].nil? || attributes["value"].nil?
-                raise NotEnoughArguments.new(self)
-            end
             super
         else
             [@list]
         end
+    end
+end
+
+class Aggregation
+    include Function
+    def initialize (type)
+    end
+    def push(o)
+        if (o.is_a?(FieldSpec))
+            info = $xc.coll_query_info(o.value, o.field).wait.value
+            is = info.map{|d| d.to_a}
+            print construct_tlv("str", is.to_s)
+        end
+        self
+    end
+    def return
+        [0]
+    end
+    def arity
+        1
     end
 end
 
@@ -447,11 +473,10 @@ class SaveCollection < StackOperation
     def return
         begin
             $xc.coll_save(@my_stack[0], @my_stack[1], @namespace).wait
-        rescue TypeError => e
-            puts e
+        rescue TypeError
             raise WrongType
         end
-        @my_stack.take(1)
+        @my_stack.drop(2)
     end
 end
 class Duplicate
@@ -514,31 +539,6 @@ class PrintHead < StackOperation
         super
     end
 end
-class DumpColl < StackOperation
-    def print_coll(collection, fields=%w[id artist album title])
-        r = $xc.coll_query_info(collection, fields).wait
-        if (r.error?)
-            #puts r.error
-        end
-
-        r.value.map do |dict|
-            r.to_a
-        end
-    end
-    def push(o)
-        if !o.is_a?(Collection)
-            raise WrongType.new(o.class, self)
-        else
-            super
-        end
-    end
-    def arity
-        1
-    end
-    def return
-        super << print_coll(@my_stack.last)
-    end
-end
 
 class PrintColl < StackOperation
     # Eventually this function will take a
@@ -547,31 +547,8 @@ class PrintColl < StackOperation
     # This is to allow for things like presenting the collection
     # in dxmms2
     def print_coll(collection, fields=%w[id artist album title])
-        r = $xc.coll_query_info(collection, fields).wait
-        if (r.error?)
-            #puts r.error
-        end
-
-        if !$screen_width.nil?
-            field_width = ($screen_width - fields.length - 1) / fields.length
-        else
-            field_width = 20
-        end
-        puts fields.collect{|f| f.ljust(field_width)}.join("|")
-        puts '-' * $screen_width
-
-        r.value.each do |dict|
-            puts "#{fields.collect {|f|
-                if dict.has_key?(f.to_sym)
-                    formatted = dict[f.to_sym].to_s
-                    formatted.force_encoding("UTF-8")
-                    true_width = field_width - (formatted.bytes.count - formatted.length) / 2
-                    formatted = formatted.ljust(true_width)[0,true_width]
-                else
-                    formatted = " " * field_width
-                end}.join("|")}"
-        end
-        puts r.value.count.to_s + " entries"
+        ids = $xc.coll_query_ids(collection).wait.value
+        $stdout.write(construct_tlv("coll", Marshal.dump(ids)))
     end
     def push(o)
         if !o.is_a?(Collection)
@@ -588,6 +565,7 @@ class PrintColl < StackOperation
         super
     end
 end
+
 class AddToPlaylist < StackOperation
     def arity
         1
@@ -595,18 +573,36 @@ class AddToPlaylist < StackOperation
     def return
         res = $xc.playlist.add_collection(@my_stack.last, []).wait
         if (res.error?)
-            puts res.error
+            raise res.error
         end
         super
     end
 end
+
+class ClearPlaylist < StackOperation
+    def arity
+        0
+    end
+    def return
+        res = $xc.playlist.clear.wait
+        if (res.error?)
+            raise res.error
+        end
+        super
+    end
+end
+
 class PrintStack < StackOperation
     def arity
         -1
     end
     def return
-        @my_stack.each_with_index do |item,i|
-            puts "%3d. %-s" % [i, item]
+        if @my_stack.empty?
+            $stdout.write(construct_tlv("str", "Empty stack"))
+        else
+            @my_stack.each_with_index do |item,i|
+                $stdout.write(construct_tlv("str", "%3d. %-s\n" % [i, item]))
+            end
         end
         super
     end
@@ -646,8 +642,6 @@ class Cons
     def return
         if @my_list.nil?
             raise NotEnoughArguments.new(self)
-            puts "got an o = #{o}"
-            puts "got an o = #{o}"
         else
             [@my_list]
         end
@@ -681,10 +675,6 @@ class Draw
     def push(o)
     end
 end
-#puts $classes
-#puts $token_pat
-#puts $token_table.values
-#puts $coll_types
 
 # returns the tokens belonging
 # to the string.
@@ -703,7 +693,7 @@ def get_token(string)
             (.*)
         \]
         \Z/x
-        a = $1.split(/\s*,\s*/)
+        a = $1.split(/\s*,\s*/).map{|s| s.strip }
         a.collect{|elem| get_token(elem)}
     else
         string
@@ -727,6 +717,10 @@ def pre_proc(string)
         end
     end
     newparts
+end
+
+def construct_tlv(tag, value)
+    [tag,value.to_s.length,value].pack("a4L<a*")
 end
 
 def build_collection (input)
@@ -764,7 +758,7 @@ def build_collection (input)
         alias :<< :push
     end
     #}}}
-    opstack = Array.new # [ [aFunction <arguments needed>] ]
+    opstack = Array.new
 
     do_token_func = Proc.new do |token|#{{{
         fn = Function.create(token)
@@ -776,11 +770,7 @@ def build_collection (input)
             end
             operands = vstack.get_ops(num_ops)
             if operands.length < num_ops
-                if $DO_CURRYING
-                    opstack << [fn, fn.arity - operands.length]
-                else
-                    raise NotEnoughArguments.new(token)
-                end
+                raise NotEnoughArguments.new(token)
             else
                 operands.each {|op| fn.push(op)}
                 fn.return.each {|r| vstack << r}
@@ -791,14 +781,14 @@ def build_collection (input)
             end
         rescue WrongType,NotEnoughArguments => err
             operands.each {|op| vstack << op}
-            puts err.message
+            input.print construct_tlv("err", err.message)
         end
     end
     #}}}
     input.each do |line|
         line.chomp! # in case we're reading from stdin
         pre_proc(line).map{|p|get_token(p)}.each do |t|
-            if $fn_syms.values.collect{|x|x.transpose[0]}.reduce(:+).include?(t)
+            if $token_table.values.include?(t)
                 do_token_func[t]
             else
                 vstack << t
@@ -813,9 +803,9 @@ def build_collection (input)
                     vstack << opstack.pop[0].return
                 end
             end
-        #print "\nvstack = #{vstack}\nopstack = #{opstack}\ntoken = #{t}\n"
-        input.puts vstack.to_s
+            #print "\nvstack = #{vstack}\nopstack = #{opstack}\ntoken = #{t}\n"
         end
+        input.write construct_tlv("ack", "")
         #puts vstack.last
     end
     vstack.pop
@@ -834,28 +824,35 @@ class UNIX_io
     def run
         while true
             client = @sock.accept
-            fork {
+            pid = fork {
                 puts "[#{$$}]client connected"
                 old_stdout = $stdout.dup
                 $stdout = client
+                class << $stdout
+                    def print(string)
+                        super construct_tlv("str", string)
+                    end
+                end
                 begin
                     build_collection(client)
-                rescue
-                    client.send("server error\n",0)
+                rescue => e
+                    client.send(construct_tlv("err", e))
                 end
                 $stdout = old_stdout
                 puts "[#{$$}]client disconnected"
                 client.close
             }
+            Process.detach(pid)
         end
     end
 end
 #UNIX_input.new.each do |line|
 #end
-fork {
+pid = fork {
     UNIX_io.new.run
     File.new($FILE_LOCK, "w").flock( File::LOCK_UN | File::LOCK_EX )
 }
+Process.detach(pid)
 
 END {
     print $SOCKET_PATH
