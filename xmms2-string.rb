@@ -8,7 +8,7 @@ $PIPE_PATH = "/tmp/#{ENV["USER"]}-xmms2-string-ipc-pipe"
 
 $xc = Xmms::Client.new("xmms2-stirg")
 begin
-    $xc.connect()
+    $xc.connect
 rescue Xmms::Client::ClientError => e
     $stderr.puts "Couldn't connect to daemon, trying to start it"
     `xmms2-launcher`
@@ -22,6 +22,7 @@ rescue Xmms::Client::ClientError => e
         `xmms2-launcher -vvvv`
         ntries += 1
     end
+    $xc.connect
     $stderr.puts "Connected."
 end
 
@@ -55,16 +56,25 @@ def get_string(sep="::",undef_string="UNDEF")
     begin
         string = info.map{|i| "#{i[0,max_width]}" }.join(sep) << "\n"
         max_width -= 1
-        print "doing this\n"
     end while (string.real_length > 70)
     $string = string
 end
 
 $xc.broadcast_playback_current_id.notifier do |res|
     get_string
+    true
 end
 
 get_string
+
+if not(File.exists?($PIPE_PATH) and File.pipe?($PIPE_PATH))
+    begin
+    File.unlink($PIPE_PATH)
+    rescue => e
+    end
+    `mkfifo #{$PIPE_PATH}`
+end
+$stdout = File.open($PIPE_PATH,"w")
 
 while true do
     begin
@@ -73,8 +83,8 @@ while true do
         p = $xc.playback_playtime.wait.value
     end
     d = $info[:duration].to_i
-    r = (p * $string.length) / d
+    r = [$string.length, (p * $string.length) / d].min
     print String.new($string).insert(r, "</fc>").insert(0,"<fc=#8aadb9>")
-    STDOUT.flush
+    $stdout.flush
     sleep 1
 end
