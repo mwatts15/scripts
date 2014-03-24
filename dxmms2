@@ -30,6 +30,16 @@ class Integer
     end
 end
 
+def time_string_to_ms(str)
+    res = 0
+    s = 1
+    for n in str.split(":").reverse do
+        s = 60 * s
+        res = res + s * (n.to_i)
+    end
+    return res.to_i
+end
+
 class String
     def initialize
         super
@@ -263,6 +273,20 @@ def get_album_ids(id)
     $xc.coll_query_ids(album_coll).wait.value
 end
 
+# The idea of this is that if I like a song around the middle of the track, I think it's a
+# really good song and it's probably new since I had to listen halfway through to decide
+# I liked it. I also consider that there may be an over-eagerness in my reaction early in
+# a track, so I penalize that. Lastly, for me, if I like the track near the end, I'm only 
+# sort-of listening to it or only like it enough to appreciate it as a whole, but can't
+# say much for it in parts.
+#
+# This should only be used additively with past `likes'
+def track_appreciation_factor(playtime, track_duration)
+    k = [0, [playtime, track_duration].min].max.to_f / track_duration - 0.5
+    l = 1.0 - k.abs
+    l
+end
+
 $commands=%w<toggle list +fav +fav-album tag tag-album prev next stop info change-playlist clear edit-metadata search shuffle repeat-playlist repeat-track repeat-off remove shutdown>
 
 $xc = Xmms::Client.new("dxmms2")
@@ -377,14 +401,20 @@ while (true) do
         end
         break
     when "+fav"
-        id = $xc.playback_current_id.wait.value
-        old_favorite = extract_medialib_info(id, :favorite)[:favorite].to_i
-        $xc.medialib_entry_property_set(id, :favorite, old_favorite+1).wait
+        begin
+            id = $xc.playback_current_id.wait.value
+            p = $xc.playback_playtime.wait.value
+            data = extract_medialib_info(id, :favorite, :duration)
+            old_favorite = data[:favorite].to_f
+            duration = data[:duration].to_i
+            appreciation = track_appreciation_factor(p, duration)
+            $xc.medialib_entry_property_set(id, :favorite, (old_favorite+appreciation).to_s).wait
+        end
         break
     when "+fav-album"
         id = $xc.playback_current_id.wait.value
         get_album_ids(id).each do |al_id|
-            old_favorite = extract_medialib_info(al_id, :favorite)[:favorite].to_i
+            old_favorite = extract_medialib_info(al_id, :favorite)[:favorite].to_f
             $xc.medialib_entry_property_set(al_id, :favorite, old_favorite+1).wait
         end
         break
@@ -408,10 +438,12 @@ while (true) do
 
         break
     when "change-playlist"
-        playlists = $xc.playlist_list.wait.value
-        playlists = playlists.delete_if {|s| s.start_with?("_")}
-        selected = my_dmenu(playlists)
-        $xc.playlist(selected).load.wait
+        begin
+            playlists = $xc.playlist_list.wait.value
+            playlists = playlists.delete_if {|s| s.start_with?("_")}
+            selected = my_dmenu(playlists)
+            $xc.playlist(selected).load.wait
+        end
         break
     when %r{repeat-(off|track|playlist)}
         case command.split(%r{-})[1]
@@ -443,7 +475,12 @@ while (true) do
             times << [x.ms_to_time_string, x]
         end
         times << ["end", dur]
-        seek_location = my_dmenu(times.map{|x| x[0]})
+        seek_location = my_dmenu(times.map{|x| x[0]}).to_s
+        seek_time = 1000 * time_string_to_ms(seek_location)
+        puts seek_time
+        puts seek_time.to_i.class
+        # XXX: Seems to be a bug here.playback_seek_ms thinks fixnums are boolean...
+        $xc.playback_seek_ms(seek_time).wait.value
         break
     else
         if not command.empty?
