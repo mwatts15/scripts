@@ -370,26 +370,27 @@ while (true) do
             end
         end
         break
-    when "search"
-        socket_path = `xce-serv`
-        xce_connection = UNIXSocket.new(socket_path)
-        while true
-            input = my_dmenu([], "field choice:")
-            if input
-                begin
-                    result = xce_connection.send(input, Socket::MSG_PEEK)
-                rescue Exception => e
-                    puts "got an exception #{e}"
-                end
-                if result != input.length
-                    break
-                end
-            else
-                break
-            end
-            my_dmenu([], xce_connection.recv(100))
-        end
-        break
+    #when "search"
+        ##socket_path = `xce-serv`
+        ##xce_connection = UNIXSocket.new(socket_path)
+        ##while true
+            ##input = my_dmenu([], "field choice:")
+            ##if input
+                ##begin
+                    ##result = xce_connection.send(input, Socket::MSG_PEEK)
+                ##rescue Exception => e
+                    ##puts "got an exception #{e}"
+                ##end
+                ##if result != input.length
+                    ##break
+                ##end
+            ##else
+                ##break
+            ##end
+            ##my_dmenu([], xce_connection.recv(100))
+        ##end
+        #`xmms2 search`
+        #break
     when "remove"
         while true
             pos = pl_list(nil,nil,"Remove entry:")
