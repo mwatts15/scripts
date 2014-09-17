@@ -5,25 +5,24 @@ require 'prelude'
 require 'socket'
 
 $PIPE_PATH = "/tmp/#{ENV["USER"]}-xmms2-string-ipc-pipe"
+$LOG_PATH = "#{ENV["HOME"]}/.config/xmms2/xmms2-string.log"
+$LOG_FILE = nil
 
 $xc = Xmms::Client.new("xmms2-stirg")
-begin
-    $xc.connect
-rescue Xmms::Client::ClientError => e
-    $stderr.puts "Couldn't connect to daemon, trying to start it"
-    `xmms2-launcher`
-    ntries = 1
-    while $? != 0
-        if ntries > 4
-            exit "Can't start xmms2d. Exiting."
+$CONNECTED=false
+while not $CONNECTED
+    begin
+        $xc.connect
+        $CONNECTED=true
+        $LOG_FILE = File.open($LOG_PATH,"w")
+        $xc.on_disconnect do 
+            $LOG_FILE.print "Server died. Getting the hell out of Dodge.\n"
+            exit
         end
-        $stderr.puts "Coludn't start the daemon, trying again..."
-        sleep 3
-        `xmms2-launcher -vvvv`
-        ntries += 1
+    rescue Xmms::Client::ClientError => e
+        $stderr.puts "Waiting for connect..."
+        sleep 1
     end
-    $xc.connect
-    $stderr.puts "Connected."
 end
 
 def extract_medialib_info(id, *fields)
@@ -65,16 +64,18 @@ $xc.broadcast_playback_current_id.notifier do |res|
     true
 end
 
-get_string
+#get_string
 
 if not(File.exists?($PIPE_PATH) and File.pipe?($PIPE_PATH))
     begin
-    File.unlink($PIPE_PATH)
+        File.unlink($PIPE_PATH)
     rescue => e
     end
     `mkfifo #{$PIPE_PATH}`
 end
+
 $stdout = File.open($PIPE_PATH,"w")
+$stderr = $LOG_FILE
 
 while true do
     begin
@@ -82,9 +83,20 @@ while true do
     rescue TypeError => e
         p = $xc.playback_playtime.wait.value
     end
-    d = $info[:duration].to_i
-    r = [$string.length, (p * $string.length) / d].min
-    print String.new($string).insert(r, "</fc>").insert(0,"<fc=#8aadb9>")
+
+    begin
+        if not ($info.nil? or p.nil?)
+            d = $info[:duration].to_i
+            r = [$string.length, (p * $string.length) / d].min
+            print String.new($string).insert(r, "</fc>").insert(0,"<fc=#8aadb9>")
+        end
+    rescue Xmms::Client::ClientError => e
+        $LOG_FILE.print "Server died. Dying.\n"
+    rescue => e
+        $LOG_FILE.print "Some error (#{e.inspect}): \n"
+        $LOG_FILE.puts e.backtrace
+        raise e
+    end
     $stdout.flush
     sleep 1
 end
