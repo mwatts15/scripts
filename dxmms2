@@ -123,19 +123,14 @@ end
 def pl_list(start=nil,nentries=nil,prompt="Track: ")
     entries = $pl.entries.wait.value
     current = $pl.current_pos.wait.value
-    start = if start.nil?
-                if current.nil? 
-                    0
-                else 
-                    current[:position] 
-                end
-            else
-                start
-            end
+    cur = current.nil? ? 0 : current[:position] 
+    start = start.nil? ? cur : start
     list_ids(entries,prompt,start,nentries)
 end
 
 def list_ids(entries,prompt,start=0,nentries=nil, commands=Hash.new)
+    # XXX: Create a list object to pass to user-supplied commands
+    #      list object allows for setting list start, page size, list content, whether to redisplay the list, and maybe other things
     morestring,endstring,startstring,backstring = 
         %w[more end start back].map{|w| $COMMAND_SIG + w}
     c1 = Hash.new
@@ -315,7 +310,11 @@ def track_appreciation_factor(playtime, track_duration)
     l
 end
 
-$commands=%w<toggle list +fav +fav-album tag tag-album prev next stop info change-playlist clear edit-metadata search shuffle repeat-playlist repeat-track repeat-off remove shutdown>
+$commands=%w<toggle list +fav +fav-album 
+tag tag-album prev next stop 
+info change-playlist clear edit-metadata search 
+shuffle repeat-playlist repeat-track repeat-off remove 
+shutdown seek>
 
 $xc = Xmms::Client.new("dxmms2")
 begin
@@ -489,6 +488,7 @@ while (true) do
         `xmms2 server shutdown`
         break
     when "seek"
+        print $xc.playback_playtime.wait.value
         id = $xc.playback_current_id.wait.value
         info = extract_medialib_info(id, :duration)
         dur = info[:duration].to_i 
@@ -500,11 +500,10 @@ while (true) do
         end
         times << ["end", dur]
         seek_location = my_dmenu(times.map{|x| x[0]}).to_s
-        seek_time = 1000 * time_string_to_ms(seek_location)
-        puts seek_time
-        puts seek_time.to_i.class
-        # XXX: Seems to be a bug here.playback_seek_ms thinks fixnums are boolean...
-        $xc.playback_seek_ms(seek_time).wait.value
+        # FIXME: This math is clearly janky. Sadly I have actual work to do.
+        seek = 20 * time_string_to_ms(seek_location)
+        puts $xc.playback_seek_ms(seek).wait.value
+        $stdout.flush
         break
     else
         if not command.empty?
