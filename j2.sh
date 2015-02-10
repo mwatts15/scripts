@@ -1,7 +1,7 @@
 #!/bin/bash
 
 JOURNAL_DIR=$HOME/journal
-GPG_NAME=$USER
+GPG_NAME=${GPG_NAME:-$USER}
 
 while [ $# -gt 0 ]; do 
     case $1 in
