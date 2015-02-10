@@ -92,7 +92,8 @@ sub print_project_list
     my @column_widths = (20, 30, 30);
     my $format_string = join(" ", map {"%-${_}s"} @column_widths) . "\n";
 
-    for my $pname (keys %project_hash)
+    my @project_names = sort(keys %project_hash);
+    for my $pname (@project_names)
     {
         printf "=%s\n", $pname;
         for my $i (0..($nfields-1))
@@ -128,7 +129,7 @@ sub print_zsh_alias_commands
     {
         my $printed_name = &desanitize_project_data($pname);
         my $dir = &desanitize_project_data($project_hash{$pname}{"dir"});
-        print FH "alias go$printed_name=\"cd $dir\"\n";
+        print FH "alias go$printed_name=\"cdcd $dir\"\n";
         print FH "alias ls$printed_name=\"ls $dir\"\n";
         print FH "alias put$printed_name=\"cp -r -t $dir\"\n";
     }
