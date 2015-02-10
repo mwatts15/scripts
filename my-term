@@ -1,4 +1,4 @@
-#!/bin/sh
-last_directory=$(cat .last-directory)
+#!/bin/zsh
+last_directory=$(cat "$HOME/.last-directory")
 cd "$last_directory"
-exec urxvt
+exec urxvt $@
