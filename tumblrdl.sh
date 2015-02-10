@@ -29,5 +29,5 @@ echo $pagenums
 pwd
 for npage in ${pagenums:-1} ; do
     echo downloading page $url/page/$npage
-    wget -O - $url/page/$npage | grep -o -e "http://[[:alnum:]/._-]*" | grep --no-group-separator -B 1 -e ".*jpg\$" | sort -u | wget -i -
+    wget -O - $url/page/$npage | grep -o -e "http://[[:alnum:]/._-]*" | egrep --no-group-separator -B 1 -e ".*jpg|gif|png\$" | sort -u | wget -i -
 done
