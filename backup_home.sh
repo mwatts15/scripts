@@ -1,22 +1,49 @@
 #!/bin/sh
 
-DEFAULT_DEST_DIR="/media/OS"
+DEFAULT_DEST_DIR="/media/Seagate Backup Plus Drive/"
 DEST_DIR="${1:-${DEST_DIR:-$DEFAULT_DEST_DIR}}"
-HOME_BACKUP_LOCATION="${DEST_DIR}/${USER}.backup"
-WORK_BACKUP_LOCATION="${DEST_DIR}/${USER}-work.backup"
-DOCS_BACKUP_LOCATION="${DEST_DIR}/${USER}-docs.backup"
-PICS_BACKUP_LOCATION="${DEST_DIR}/${USER}-pics.backup"
+COLUMNS=80
+GLOBAL_EXCLUDES=backup-excludes
 
-rsync --delete -axv --exclude-from="$HOME/home_backup_excludes" $HOME/ "$HOME_BACKUP_LOCATION" 2>rsync-backup-errors >rsync-out
-echo "===================================================" |tee -a rsync-backup-errors rsync-out
-echo "====================== WORK =======================" |tee -a rsync-backup-errors rsync-out
-echo "===================================================" |tee -a rsync-backup-errors rsync-out 
-rsync --delete -axv --exclude-from="$HOME/work_backup_excludes" $HOME/work/ "$WORK_BACKUP_LOCATION" 2>>rsync-backup-errors >>rsync-out
-echo "===================================================" |tee -a rsync-backup-errors rsync-out
-echo "==================== DOCUMENTS ====================" |tee -a rsync-backup-errors rsync-out
-echo "===================================================" |tee -a rsync-backup-errors rsync-out 
-rsync --delete -axv --exclude-from="$HOME/docs_backup_excludes" $HOME/documents/ "$DOCS_BACKUP_LOCATION" 2>>rsync-backup-errors >>rsync-out
-echo "===================================================" |tee -a rsync-backup-errors rsync-out
-echo "==================== PICTURES =====================" |tee -a rsync-backup-errors rsync-out
-echo "===================================================" |tee -a rsync-backup-errors rsync-out 
-rsync --delete -axv --exclude-from="$HOME/pics_backup_excludes" $HOME/pictures/ "$PICS_BACKUP_LOCATION" 2>>rsync-backup-errors >>rsync-out
+backup () {
+    name=$1
+    source_location=$2
+    dry_run=$3
+
+    backup_location="${DEST_DIR}/${USER}-${name}.backup"
+    excludes="./${name}_backup_excludes"
+    dry_run_args=""
+
+    touch $excludes
+    message "${name}" | tee -a rsync-backup-errors rsync-out
+
+    if [ $dry_run ] ; then 
+        message "dry run"
+        dry_run_args="-n -i"
+    fi
+    rsync ${dry_run_args} --delete -ax --exclude-from="${GLOBAL_EXCLUDES}" --exclude-from="${excludes}" "${source_location}" "${backup_location}" 2>>rsync-backup-errors >>rsync-out
+}
+
+message()
+{
+     value=${#1}
+     printf "%${COLUMNS}s\n"
+     if [ $value -lt $COLUMNS ] ; then
+       width=$(( (  $COLUMNS + $value ) / 2 ))
+       printf "%${width}s\n"  "$1"
+     else
+        echo "$1"
+     fi
+     printf "%${COLUMNS}s\n"
+}
+rm rsync-out rsync-backup-errors
+touch "${GLOBAL_EXCLUDES}"
+
+for x in `cat backup.config` ; do
+    if [ ! `echo $x | grep -e "^#"` ] ; then
+        name=${x%%:*}
+        source=${x##*:}
+        backup "${name}" "${source}"
+    fi
+done
+cp rsync-out rsync-backup-errors "${DEST_DIR}/"
