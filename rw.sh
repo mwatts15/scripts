@@ -43,12 +43,12 @@ unset IFS
 
 if [ ! -e $WP_CACHE ] ; then echo 0 >$WP_CACHE ; fi
 
-diff $WP_TMP $STORED_FILES
+diff $WP_TMP $STORED_FILES > /dev/null
 status=$?
 [ x$WP_RECACHE = xFALSE ] && status=0
 if [ $status -ne 0 -o ! -s $WP_CACHE ] ; then
     get_wp_sized_pics $WP_TMP > $WP_CACHE
-    shuf $WP_CACHE -o $WP_CACHE # works because shuf is nice :)
+    shuf $WP_CACHE -o $WP_CACHE # piping directly to the input works because shuf is nice :)
     mv $WP_TMP $STORED_FILES
 else
     rm $WP_TMP
