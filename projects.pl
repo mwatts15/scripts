@@ -5,7 +5,7 @@ use Env;
 use File::Basename;
 use File::Spec;
 use Getopt::Std;
-use feature qw/switch/;
+use feature "switch";
 
 my $CWD = cwd;
 my $HOME = $ENV{'HOME'};
@@ -15,6 +15,61 @@ my $TGF;
 my %project_hash = ();
 
 my @unalias_list = ();
+
+sub natatime ($@)
+{
+    my $n = shift;
+    my @list = @_;
+
+    return sub
+    {
+        return splice @list, 0, $n;
+    }
+}
+
+my @actions_list = (
+    "add" =>
+    {
+        arg=>"PROJECT_NAME PROJECT_DIRECTORY", 
+        desc=>"Add an entry to the project list",
+        act=>sub {
+            my ($pname, $dir) = @_;
+            $dir = File::Spec->rel2abs($dir);
+            if (! length($pname))
+            {
+                $pname = $BASE;
+            }
+
+            if (! length($dir))
+            {
+                $dir = $CWD;
+            }
+            &add_entry($pname, $dir);
+        }
+    },
+    "add-remote" => 
+    {
+        arg=>"PROJECT_NAME REMOTE_DIRECTORY", 
+        desc=>"Add the remote directory (e.g., upstream git) for the project", 
+        act=>\&add_remote
+    },
+    "put-remote" => 
+    {
+        arg=>"PROJECT_NAME FILE_TO_TRANSFER",
+        desc=>"Copy a file from the project directory to the configured remote directory over SSH",
+        act=> \&scp_to_remote
+    },
+    "rm" => 
+    {
+        arg=> "PROJECT_NAME",
+        desc=>"Remove the project entry",
+        act=>\&remove_entry
+    },
+    "list" => {desc=>"List projects", act=>\&print_project_list},
+    "help" => {desc=>"Print this help message", act=>\&print_help}
+);
+
+my %actions = @actions_list;
 
 sub menu
 {
@@ -84,26 +139,72 @@ sub parse_targets_file
     }
 }
 
+# Gets the maximum length of strings in each column of an array of arrayrefs of strings
+sub column_widths
+{
+    my @a = @_;
+    my @maxes = map { 0 } @{$a[0]};
+    my $len = @maxes;
+    for my $ent (@a)
+    {
+        my @arr = @$ent;
+        for (my $i = 0; $i < $len; $i++)
+        {
+            if ($maxes[$i] < length($arr[$i]))
+            {
+                $maxes[$i] = length($arr[$i]);
+            }
+        }
+    }
+    @maxes;
+}
+
+sub column_widths_to_format_string
+{
+    my @column_widths = @_;
+    join(" ", map {"%-${_}s"} @column_widths);
+}
+
 sub print_project_list
 {
     my @field_names = qw/Directory Remote/;
     my @fields = qw/dir remote/;
     my $nfields = scalar(@fields);
     my @column_widths = (20, 30, 30);
-    my $format_string = join(" ", map {"%-${_}s"} @column_widths) . "\n";
+    my $format_string = &column_widths_to_format_string(@column_widths). "\n";
 
     my @project_names = sort(keys %project_hash);
+    my @data = ();
+
     for my $pname (@project_names)
     {
-        printf "=%s\n", $pname;
+        #printf "=%s\n", &desanitize_project_data($pname);
         for my $i (0..($nfields-1))
         {
             my $v = $project_hash{$pname}{$fields[$i]};
             if ($v)
             {
-                printf "  %s:%s\n", $field_names[$i], &desanitize_project_data($v);
+                $v = &desanitize_project_data($v);
+                my $x = "$pname";
+                if ($i > 0)
+                {
+                    $x = "";
+                }
+                if ($fields[$i] eq 'dir')
+                {
+                    $v =~ s/^\Q${HOME}\E/\$HOME/;
+                }
+                my @l = (&desanitize_project_data($x), $field_names[$i]. ":", &desanitize_project_data($v));
+                push @data, \@l;
+                #printf "%s:%s\n", $field_names[$i], ;
             }
         }
+    }
+    my @widths = column_widths(@data);
+    my $format = &column_widths_to_format_string(@widths). "\n";
+    for my $ent (@data)
+    {
+        printf $format, @$ent;
     }
 }
 
@@ -214,43 +315,62 @@ sub scp_to_remote
 sub do_action
 {
     my $action = shift @_;
-    given($action)
+    my @args = map {&sanitize_project_data($_)} @_;
+    
+    my $action = $actions{$action};
+    if (defined $action)
     {
-        my @args = map {&sanitize_project_data($_)} @_;
-        when (["def", "add"])
+        if (ref($action) eq 'HASH')
         {
-            my ($pname, $dir) = @args;
-            $dir = File::Spec->rel2abs($dir);
-            if (! length($pname))
+            my %act_data = %{$action};
+            $act_data{act}(@args);
+        }
+        elsif (ref($action) eq 'CODE')
+        {
+            &{$action}(@args);
+        }
+    }
+}
+
+sub print_help
+{
+    my $it = natatime 2, @actions_list;
+
+    my @help_data = ();
+    print "Usage: " . basename($0) . " COMMAND\n";
+    print "Manage project data.\n"; 
+    print "\n"; 
+    print "Available commands:\n";
+    while (my @t = $it->())
+    {
+        my ($key, $ent) = @t;
+        my @l = ();
+        push @l, $key . " ";
+        my $reftype = ref($ent);
+        if ($reftype eq 'HASH')
+        {
+            my %h = %$ent;
+            my $s = "";
+            if (defined $h{arg})
             {
-                $pname = $BASE;
+                $l[0] .= $h{arg};
             }
 
-            if (! length($dir))
-            {
-                $dir = $CWD;
-            }
-            &add_entry($pname, $dir);
+            $s .= $h{"desc"};
+            push @l, $s;
         }
-        when ("add-remote")
+        else
         {
-            my ($pname, $url) = @args;
-            &add_remote($pname, $url);
+            push @l, "";
         }
-        when ("put-remote")
-        {
-            my ($pname, $file) = @args;
-            &scp_to_remote($pname, $file);
-        }
-        when ("rm")
-        {
-            my ($pname) = @args;
-            &remove_entry($pname);
-        }
-        default
-        {
-            &print_project_list;
-        }
+        push @help_data, \@l;
+    }
+    my @cdata = column_widths(@help_data);
+    @cdata = map { $_ + 2 } @cdata;
+    my $format = column_widths_to_format_string(@cdata);
+    for my $d (@help_data)
+    {
+        printf "$format\n", @$d;
     }
 }
 
