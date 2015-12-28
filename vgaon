@@ -1,0 +1,43 @@
+#!/bin/sh
+
+VGA_CONFIG=${VGA_CONFIG:-$HOME/.vgaconf}
+echo $VGA_CONFIG
+. "`readlink -f $VGA_CONFIG`"
+MON=${MON:-LVDS1}
+MODE=${MODE:-1366x768}
+EXTMODE=${EXTMODE:-1024x768}
+EXTMON=${EXTMON:-VGA1}
+POS=${POS:-below}
+
+srun() {
+    sleep 1
+    echo Running %$@%
+    $@
+}
+type SETUP > /dev/null 2> /dev/null
+if [ $? -eq 0 ] ; then
+    SETUP
+fi
+
+PROG=`basename $0`
+
+if [ $PROG = 'vgaon' ] ; then
+    srun xrandr --output $EXTMON --off
+    srun xrandr --output $EXTMON --mode $EXTMODE
+    srun xrandr --output $EXTMON --rotate normal --preferred 
+    type AFTER_EXT > /dev/null 2> /dev/null
+    if [ $? -eq 0 ] ; then
+        AFTER_EXT
+    fi
+    srun xrandr --output $MON --mode $MODE
+    srun xrandr --output $MON --rotate normal --${POS} $EXTMON
+    srun $HOME/.fehbg
+
+    type AFTER > /dev/null 2> /dev/null
+    if [ $? -eq 0 ] ; then
+        AFTER
+    fi
+else
+    srun xrandr --output $EXTMON --off
+    srun $HOME/.fehbg
+fi
