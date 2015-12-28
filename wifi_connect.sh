@@ -18,7 +18,10 @@ message ()
 ARGS=$(getopt -o a -l auto -n "$0" -- "$@")
 eval set -- "$ARGS"
 
-while true; do
+n=0
+limit=10
+
+while [ $n -lt $limit ] ; do
     opt=$1;
     shift
     case "$opt" in
@@ -29,6 +32,7 @@ while true; do
             break;
             ;;
     esac
+    $(( n = n+1))
 done
 
 connlist="$(nmcli -f name con list |
@@ -39,7 +43,9 @@ egrep -e '.+' |
 awk '!x[$0]++' -)"
 ncons=$(echo "$connlist" | wc -l)
 
-while true ; do
+limit=10
+n=0
+while [ $n -lt $limit ] ; do
     if [ $AUTO_CHOOSE -eq 1 ] ; then
         c=$(echo "$connlist" | head -n 1)
     else
@@ -53,6 +59,8 @@ while true ; do
 
     nmcli con up id "$c" && message "connected." && break
     connlist="$(echo "$connlist" | grep -v "$c")\n$c"
+
+    $(( n = n+1))
 done
 
 connlist="$c\n$connlist"
