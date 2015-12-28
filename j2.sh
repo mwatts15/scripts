@@ -15,6 +15,7 @@ while [ $# -gt 0 ]; do
         -e)
             shift
             readlist=`grep -e $1 -l $JOURNAL_DIR/*`
+            doread=true
             shift
             ;;
         *)
@@ -93,10 +94,9 @@ echo >>${dt}
 echo >>${dt}
 echo --$USER >>${dt}
 echo $timestamp >>${dt}
-vim_newentry_map="nmap ,l o<ESC>!!date +\\\\%_H\\\\%M<CR>i<End>"
 case $EDITOR in
     *vim|*vi)
-        vim +"read ${dt}" +"set wrap" +"set spell" +"exec \"$vim_newentry_map\"" +"startinsert" +"set tw=0" +/^$/ $fname
+        vim +"read ${dt}" +"set wrap" +"set spell" +"startinsert" +"set tw=0" +/^$/ $fname
         ;;
     *nano)
         cat ${dt} | $EDITOR --softwrap $fname
