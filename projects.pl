@@ -5,6 +5,8 @@ use Env;
 use File::Basename;
 use File::Spec;
 use Getopt::Std;
+use Util qw(natatime);
+use CStore qw(sanitize_value desanitize_value parse);
 use feature "switch";
 
 my $CWD = cwd;
@@ -15,17 +17,6 @@ my $TGF;
 my %project_hash = ();
 
 my @unalias_list = ();
-
-sub natatime ($@)
-{
-    my $n = shift;
-    my @list = @_;
-
-    return sub
-    {
-        return splice @list, 0, $n;
-    }
-}
 
 my @actions_list = (
     "add" =>
@@ -103,40 +94,9 @@ sub start
     &parse_targets_file;
 }
 
-sub sanitize_project_data
-{
-    my $data = $_[0];
-    # The `#' has to come first so it doesn't get replaced twice in the string
-    my @badchars = ("#", ":", " ");
-    for my $ch (@badchars)
-    {
-        my $ch_num = ord($ch);
-        $data =~ s/$ch/"#" . sprintf("%05d", $ch_num)/eg;
-    }
-    $data;
-}
-
-sub desanitize_project_data
-{
-    my $data = $_[0]; 
-    $data =~ s/#([0-9]{5})/chr($1)/eg;
-    $data;
-}
-
 sub parse_targets_file
 {
-    seek $TGF, 0, 0;
-    while (!eof($TGF))
-    {
-        chomp(my $line = readline $TGF);
-        my ($pname, $rest) = split /:/, $line, 2;
-        my (%pinfo) = split /:/, $rest;
-        $project_hash{$pname} = ();
-        for my $key (keys %pinfo)
-        {
-            $project_hash{$pname}{$key} = $pinfo{$key};
-        }
-    }
+    %project_hash = %{parse($TGF)};
 }
 
 # Gets the maximum length of strings in each column of an array of arrayrefs of strings
@@ -178,13 +138,13 @@ sub print_project_list
 
     for my $pname (@project_names)
     {
-        #printf "=%s\n", &desanitize_project_data($pname);
+        #printf "=%s\n", &desanitize_value($pname);
         for my $i (0..($nfields-1))
         {
             my $v = $project_hash{$pname}{$fields[$i]};
             if ($v)
             {
-                $v = &desanitize_project_data($v);
+                $v = &desanitize_value($v);
                 my $x = "$pname";
                 if ($i > 0)
                 {
@@ -194,7 +154,7 @@ sub print_project_list
                 {
                     $v =~ s/^\Q${HOME}\E/\$HOME/;
                 }
-                my @l = (&desanitize_project_data($x), $field_names[$i]. ":", &desanitize_project_data($v));
+                my @l = (&desanitize_value($x), $field_names[$i]. ":", &desanitize_value($v));
                 push @data, \@l;
                 #printf "%s:%s\n", $field_names[$i], ;
             }
@@ -228,8 +188,8 @@ sub print_zsh_alias_commands
     open FH, ">", "$HOME/.project_aliases";
     for my $pname (keys %project_hash)
     {
-        my $printed_name = &desanitize_project_data($pname);
-        my $dir = &desanitize_project_data($project_hash{$pname}{"dir"});
+        my $printed_name = &desanitize_value($pname);
+        my $dir = &desanitize_value($project_hash{$pname}{"dir"});
         print FH "alias go$printed_name=\"cdcd $dir\"\n";
         print FH "alias ls$printed_name=\"ls $dir\"\n";
         print FH "alias put$printed_name=\"cp -r -t $dir\"\n";
@@ -237,7 +197,7 @@ sub print_zsh_alias_commands
 
     for my $pname (@unalias_list)
     {
-        my $printed_name = &desanitize_project_data($pname);
+        my $printed_name = &desanitize_value($pname);
         print FH "unalias go$printed_name";
         print FH "unalias ls$printed_name";
         print FH "unalias put$printed_name";
@@ -284,7 +244,7 @@ sub add_entry
 
     if (! -d $dir)
     {
-        mkdir &desanitize_project_data($dir);
+        mkdir &desanitize_value($dir);
     }
     $project_hash{$name}{"dir"} = $dir;
 }
@@ -307,7 +267,7 @@ sub scp_to_remote
 {
     my ($pname, $file) = @_;
     my $remote = $project_hash{$pname}{remote};
-    $remote = &desanitize_project_data($remote);
+    $remote = &desanitize_value($remote);
     print "scp -r $file $remote/.\n";
     `scp -r $file $remote/.`;
 }
@@ -315,7 +275,7 @@ sub scp_to_remote
 sub do_action
 {
     my $action = shift @_;
-    my @args = map {&sanitize_project_data($_)} @_;
+    my @args = map {&sanitize_value($_)} @_;
     
     my $action = $actions{$action};
     if (defined $action)
@@ -388,4 +348,4 @@ sub end
 # quick tests
 #
 #&menu(qw/all these fucking entries wont quit/);
-#print desanitize_project_data($project_hash{crypto}{remote}) . "\n";
+#print desanitize_value($project_hash{crypto}{remote}) . "\n";
