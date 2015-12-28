@@ -4,6 +4,12 @@ import sqlite3
 import time
 import sys
 from os import environ
+import os
+import ConfigParser
+
+CONF = ConfigParser.SafeConfigParser()
+CONF.read(environ['HOME'] + "/.bookmarks.conf")
+
 try:
     sys.setappdefaultencoding('utf-8')
 except:
@@ -11,14 +17,19 @@ except:
     sys.setdefaultencoding('utf-8')
 
 def connectToDB():
-    tdb = TagDB(environ['HOME'] + '/.mozilla/firefox/mwad0hks.default/places.sqlite')
+    global CONF
+    places_file = CONF.get('bookmarks', 'places')
+    tdb = TagDB(places_file)
     return tdb
 
 class TagDB:
     def __init__(self, db_name):
-        self.conn = sqlite3.connect(db_name)
-        self.c = self.conn.cursor()
-        self.c.execute("PRAGMA foreign_keys=ON")
+        if os.path.isfile(db_name):
+            self.conn = sqlite3.connect(db_name)
+            self.c = self.conn.cursor()
+            self.c.execute("PRAGMA foreign_keys=ON")
+        else:
+            raise Exception('Database file "' + db_name + '" does not exist')
 
     def extract_tags(self):
         query = """
@@ -56,10 +67,12 @@ f = {}
 for r in titlos:
     f[r[0]] = {}
     f[r[0]]['title'] = r[1]
+
 for r in tags:
-    if not ('tags' in f[r[0]]):
-        f[r[0]]['tags'] = []
-    f[r[0]]['tags'].append(r[1])
+    if r[0] in f:
+        if not ('tags' in f[r[0]]):
+            f[r[0]]['tags'] = []
+        f[r[0]]['tags'].append(r[1])
 
 for r in f:
     print unicode(r) + "|" + unicode(f[r]['title']) + "|",
