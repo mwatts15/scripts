@@ -37,7 +37,7 @@ if [ -z "$title" ] ; then
     exit 1
 fi
 date=`date +%Y%m%d%H%M%S`
-fname=`echo $nideas-$date-$title | sed -e "s/ /_/g"`
+fname=`echo $nideas-$date-$title | sed -e "s/[[:space:][:punct:]]/_/g"`
 
 echo "$title" | tr '[a-z]' '[A-Z]' | cat >dt
 echo "$title " | sed s/./-/g | cat >>dt
