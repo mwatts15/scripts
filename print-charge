@@ -1,3 +1,6 @@
+#!/bin/sh
+
 full=`cat /sys/class/power_supply/BAT0/charge_full`.0
 now=`cat /sys/class/power_supply/BAT0/charge_now`.0
-echo $((now  / full))
+exo="scale=5; $now  / $full;"
+echo $exo | bc -l
