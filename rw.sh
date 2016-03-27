@@ -32,7 +32,7 @@ get_wp_sized_pics ()
     done < $my_files
 }
 
-WP_TMP=/tmp/rwtmp-$$
+WP_TMP=`mktemp /tmp/rwtmp-XXXXXX`
 IFS=':'
 tail -n +2 $WP_CACHE > $WP_TMP; mv $WP_TMP $WP_CACHE
 echo -n >$WP_TMP
@@ -62,5 +62,6 @@ if [ x$WP_TITLE_OVERLAY == xTRUE ] ; then
 else
     cp "$wpfile" $HOME/.rwbg
 fi
+echo $wpfile
 
 $WP_CMD $HOME/.rwbg
