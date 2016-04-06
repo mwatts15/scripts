@@ -1,0 +1,133 @@
+#!/usr/bin/env ruby
+# Write/remove a task to do later.
+require 'dmenu_util'
+$SB='"#336699"'
+$SF='"#cccccc"'
+$NB='"#111111"'
+$NF='"#cccccc"'
+$SCREEN_WIDTH=1366
+$FONT_WIDTH=14 #in pixels
+$FONT='"Sazanami Mincho":pixelsize=' + $FONT_WIDTH.to_s
+
+$COMMAND_SIG = "@"
+$FILE="#{ENV["HOME"]}/.todo"
+
+$add_or_delete_commands = %w[move edit]
+
+def my_dmenu (entries, prompt='todo', height=false, width=$SCREEN_WIDTH)
+    dmenu(entries, prompt, height, width,
+              $NF,
+              $NB,
+              $SF,
+              $SB)
+end
+
+$entries = File.open($FILE) do |f|
+    f.lines.to_a.map{|x| x.to_s.chomp}
+end
+
+def numbered_entries(e)
+    width = (Math.log(e.length) / Math.log(10)).to_i + 1
+    e.each_with_index.map{|x,i| "#{"%#{width}d" % (i+1) }. #{x}"}
+end
+
+def split_task(s)
+    md = s.match(/^ *([0-9]+)\. *(.*)$/)
+    [md[1].to_i, md[2]]
+end
+
+def extract_index_from_task_text(s)
+    idx = /^ *[0-9]+/.match(s)
+    if !idx.nil?
+        idx[0].to_i - 1
+    else
+        -1
+    end
+
+end
+
+def move_entryDM
+    # Moves an entry from one place to another with user interaction
+    t = my_dmenu(numbered_entries($entries), "Move which task?")
+    idx = extract_index_from_task_text(t)
+    if idx >= 0
+        copy = Array.new($entries)
+        x = copy.delete_at(idx)
+        s = my_dmenu(numbered_entries(copy), "Put task where?")
+        idx = extract_index_from_task_text(s)
+        if idx >= 0
+            copy.insert(idx, x)
+            $entries = copy
+        end
+        true
+    else
+        false
+    end
+end
+
+def add_or_deleteDM
+    prompt="Add/delete a task"
+    task = my_dmenu(numbered_entries($entries) + $add_or_delete_commands.map{|x|$COMMAND_SIG+x}, prompt)
+    if task.empty?
+        false
+    elsif task.to_s.start_with?($COMMAND_SIG)
+        add_or_delete_commandDM(task)
+    else
+        idx = extract_index_from_task_text(task)
+        if idx >= 0
+            $entries.delete_at(idx)
+        else
+            $entries.push(task)
+        end
+        true
+    end
+end
+
+def editDM
+    prompt = "Editing..."
+    task = my_dmenu(numbered_entries($entries), prompt)
+    if task.empty?
+        false
+    else
+        idx, content  = split_task(task)
+        idx = idx - 1
+        if idx >= 0
+            $entries.delete_at(idx)
+            $entries.insert(idx, content)
+        end
+        true
+    end
+
+end
+
+def add_or_delete_commandDM(command)
+    command = command[1..-1]
+    case command
+    when "move"
+        while move_entryDM
+        end
+        true
+    when "edit"
+        while editDM
+        end
+        true
+    when *($add_or_delete_commands)
+        puts "Sorry, #{command} has not been implemented yet!"
+        false
+    else
+        true
+    end
+end
+
+def mainDM
+    add_or_deleteDM
+end
+
+i = 0
+while mainDM
+end
+
+File.open($FILE, "w") do |f|
+    f.write($entries.join("\n"))
+end
+# md = "do the laundary @ tomorrow $ 3.00".match(%r{([#{delimeters}][^#{delimeters}]*)+})
