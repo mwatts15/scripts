@@ -46,7 +46,7 @@ Open3.popen3(cmd) do |stdin, stdout, stderr, wait_thr|
                 options[short_name] = [long_name, desc.string]
             end
         end
-        choice = my_dmenu(options.keys)
-        my_dmenu(options[choice][1].split("\n"), "definition for #{selection}")
+        choice = dmenu(options.keys)
+        dmenu(options[choice][1].split("\n"), "definition for #{selection}")
     end
 end
