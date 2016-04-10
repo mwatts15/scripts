@@ -10,9 +10,14 @@ $FONT_WIDTH=14 #in pixels
 $FONT='"Sazanami Mincho":pixelsize=' + $FONT_WIDTH.to_s
 
 $COMMAND_SIG = "@"
+$GROUP_SIG = "+"
+$UNSORTED_NAME = $GROUP_SIG.next.next
 $FILE="#{ENV["HOME"]}/.todo"
 
-$add_or_delete_commands = %w[move edit]
+$GROUP_REGEX = /#{Regexp.escape($GROUP_SIG)}[^ ]+/
+
+$add_or_delete_commands = %w[move edit group-view]
+$group_view_commands = %w[move edit]
 
 def my_dmenu (entries, prompt='todo', height=false, width=$SCREEN_WIDTH)
     dmenu(entries, prompt, height, width,
@@ -33,7 +38,11 @@ end
 
 def split_task(s)
     md = s.match(/^ *([0-9]+)\. *(.*)$/)
-    [md[1].to_i, md[2]]
+    if md.nil?
+        [-1, s]
+    else
+        [md[1].to_i, md[2]]
+    end
 end
 
 def extract_index_from_task_text(s)
@@ -53,7 +62,7 @@ def move_entryDM
     if idx >= 0
         copy = Array.new($entries)
         x = copy.delete_at(idx)
-        s = my_dmenu(numbered_entries(copy), "Put task where?")
+        s = my_dmenu(numbered_entries(copy + ['']), "Put task where?")
         idx = extract_index_from_task_text(s)
         if idx >= 0
             copy.insert(idx, x)
@@ -97,11 +106,10 @@ def editDM
         end
         true
     end
-
 end
 
 def add_or_delete_commandDM(command)
-    command = command[1..-1]
+    command = command[($COMMAND_SIG.length)..-1]
     case command
     when "move"
         while move_entryDM
@@ -111,12 +119,140 @@ def add_or_delete_commandDM(command)
         while editDM
         end
         true
+    when "group-view"
+        while group_viewDM
+        end
+        true
     when *($add_or_delete_commands)
         puts "Sorry, #{command} has not been implemented yet!"
         false
     else
         true
     end
+end
+
+def group_viewDM
+    prompt="Add/delete a task or group of tasks"
+    task = groupDM(prompt)
+
+    if task.empty?
+        false
+    elsif task.start_with?($UNSORTED_NAME)
+        delete_ungroupedDM
+    elsif task.start_with?($GROUP_SIG)
+        delete_groupDM(task)
+    elsif task.start_with?($COMMAND_SIG)
+        group_view_commandDM(task)
+    else
+        idx = extract_index_from_task_text(task)
+        if idx >= 0
+            $entries.delete_at(idx)
+        else
+            $entries.push(task)
+        end
+        true
+    end
+end
+
+def groupDM(prompt)
+    ents = groups_list(grouped_entries) +
+                      $group_view_commands.map{|x|$COMMAND_SIG+x}
+    my_dmenu(ents, prompt)
+end
+
+def grouped_entries
+    groups = Hash.new
+    numbered_entries($entries).each do |task|
+        task_groups = task.to_s.scan($GROUP_REGEX)
+        if task_groups.empty?
+            task_groups = [$UNSORTED_NAME]
+        end
+        task_groups.each do |x|
+            if groups[x].nil?
+                groups[x] = Array.new
+            end
+            groups[x].push(task)
+        end
+    end
+    groups
+end
+
+def groups_list(groups)
+    grouped_entries_presentation = Array.new
+    sorted_groups = groups.keys.sort_by{|x| x.downcase }
+    sorted_groups.each do |k|
+        grouped_entries_presentation.push(k)
+        groups[k].each do |task|
+            grouped_entries_presentation.push("    "+task)
+        end
+    end
+    grouped_entries_presentation
+end
+
+def delete_ungroupedDM
+    response = my_dmenu(%w(yes no), "Delete every ungrouped task?")
+    if response == 'yes'
+        $entries.delete_if {|x| ! x.match($GROUP_REGEX)}
+    end
+    true
+end
+
+def delete_groupDM(group)
+    response = my_dmenu(%w(yes no), "Delete all in #{group}?")
+    if response == 'yes'
+        $entries.delete_if {|x| x.match(Regexp.escape(group))}
+    end
+    true
+end
+
+def group_view_commandDM(command)
+    command = command[($COMMAND_SIG.length)..-1]
+    case command
+    when "edit"
+        while group_view_editDM
+        end
+        true
+    when *($group_view_commands)
+        puts "Sorry, #{command} has not been implemented yet!"
+        false
+    else
+        true
+    end
+end
+
+def group_view_editDM
+    groups = grouped_entries
+    task = my_dmenu(groups_list(groups), "Editing...")
+    if task.empty?
+        false
+    elsif task == $UNSORTED_NAME
+        edit_groupDM(task)
+    elsif groups.include?(task)
+        edit_groupDM(task)
+    else
+        idx, content = split_task(task)
+        idx = idx - 1
+        if idx >= 0
+            $entries.delete_at(idx)
+            $entries.insert(idx, content)
+            true
+        else
+            false
+        end
+    end
+end
+
+def edit_groupDM(group)
+    groups = grouped_entries
+    groups = groups.keys.delete_if{|x| x == $UNSORTED_NAME}
+    new_name = my_dmenu(groups, "Replace #{group} with")
+    $entries = $entries.map {|x| x.gsub(/#{Regexp.escape(group)}/, new_name)}
+    $entries.each do |x|
+        puts(x)
+        puts(/#{Regexp.escape(group)}/)
+        puts(new_name)
+    end
+    true
 end
 
 def mainDM
