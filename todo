@@ -12,14 +12,19 @@ $FONT='"Sazanami Mincho":pixelsize=' + $FONT_WIDTH.to_s
 $COMMAND_SIG = "@"
 $GROUP_SIG = "+"
 $UNSORTED_NAME = $GROUP_SIG.next.next
-$FILE="#{ENV["HOME"]}/.todo"
+$FILE="#{ENV["HOME"]}/todo/todo.txt"
 
 $GROUP_REGEX = /#{Regexp.escape($GROUP_SIG)}[^ ]+/
 
-$add_or_delete_commands = %w[move edit group-view]
-$group_view_commands = %w[move edit]
+$ADD_OR_DELETE_COMMANDS = %w[move edit group-view vim]
+$GROUP_VIEW_COMMANDS = %w[move edit]
+$at_end = []
 
 def my_dmenu (entries, prompt='todo', height=false, width=$SCREEN_WIDTH)
+    if not height
+        height = entries.length
+    end
+    height = [height, 20].min
     dmenu(entries, prompt, height, width,
               $NF,
               $NB,
@@ -76,7 +81,7 @@ end
 
 def add_or_deleteDM
     prompt="Add/delete a task"
-    task = my_dmenu(numbered_entries($entries) + $add_or_delete_commands.map{|x|$COMMAND_SIG+x}, prompt)
+    task = my_dmenu(numbered_entries($entries) + $ADD_OR_DELETE_COMMANDS.map{|x|$COMMAND_SIG+x}, prompt)
     if task.empty?
         false
     elsif task.to_s.start_with?($COMMAND_SIG)
@@ -123,7 +128,10 @@ def add_or_delete_commandDM(command)
         while group_viewDM
         end
         true
-    when *($add_or_delete_commands)
+    when "vim"
+        $at_end.push (lambda { spawn("gvim #{$FILE}", :out => "/dev/null", :err => "/dev/null" ) })
+        false
+    when *($ADD_OR_DELETE_COMMANDS)
         puts "Sorry, #{command} has not been implemented yet!"
         false
     else
@@ -139,7 +147,7 @@ def group_viewDM
         false
     elsif task.start_with?($UNSORTED_NAME)
         delete_ungroupedDM
-    elsif task.start_with?($GROUP_SIG)
+    elsif task.match($GROUP_REGEX).end(0) == task.length
         delete_groupDM(task)
     elsif task.start_with?($COMMAND_SIG)
         group_view_commandDM(task)
@@ -156,7 +164,7 @@ end
 
 def groupDM(prompt)
     ents = groups_list(grouped_entries) +
-                      $group_view_commands.map{|x|$COMMAND_SIG+x}
+                      $GROUP_VIEW_COMMANDS.map{|x|$COMMAND_SIG+x}
     my_dmenu(ents, prompt)
 end
 
@@ -190,7 +198,7 @@ def groups_list(groups)
 end
 
 def delete_ungroupedDM
-    response = my_dmenu(%w(yes no), "Delete every ungrouped task?")
+    response = my_dmenu(%w(no yes), "Delete every ungrouped task?")
     if response == 'yes'
         $entries.delete_if {|x| ! x.match($GROUP_REGEX)}
     end
@@ -198,7 +206,7 @@ def delete_ungroupedDM
 end
 
 def delete_groupDM(group)
-    response = my_dmenu(%w(yes no), "Delete all in #{group}?")
+    response = my_dmenu(%w(no yes), "Delete all in #{group}?")
     if response == 'yes'
         $entries.delete_if {|x| x.match(Regexp.escape(group))}
     end
@@ -212,7 +220,7 @@ def group_view_commandDM(command)
         while group_view_editDM
         end
         true
-    when *($group_view_commands)
+    when *($GROUP_VIEW_COMMANDS)
         puts "Sorry, #{command} has not been implemented yet!"
         false
     else
@@ -265,5 +273,9 @@ end
 
 File.open($FILE, "w") do |f|
     f.write($entries.join("\n"))
+end
+
+$at_end.each do |p|
+    p.call
 end
 # md = "do the laundary @ tomorrow $ 3.00".match(%r{([#{delimeters}][^#{delimeters}]*)+})
