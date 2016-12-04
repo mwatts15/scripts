@@ -1,0 +1,34 @@
+#!/bin/bash
+
+load_sinks () {
+    pactl unload-module module-alsa-sink
+    while read dev ; do
+        pactl load-module module-alsa-sink "device=$dev" 2>/dev/null >&2
+    done < <(aplay --list-pcms | grep '^hw')
+}
+
+list_sinks () {
+    tmp0=$(mktemp)
+    pactl list short sinks > $tmp0
+    pactl list sinks | grep 'device.description' | grep -o -e '".*' | paste $tmp0 -
+}
+
+choose_sink () {
+    res=$(list_sinks | paste | column -s$'\t' -t | my_dmenu)
+    res=${res%% *}
+    echo "$res"
+}
+
+list_sink_inputs () { 
+    pactl list short sink-inputs
+}
+load_sinks
+sink=$(choose_sink)
+if [ $sink ] ; then
+    pactl set-default-sink $sink
+    while read input ; do
+        sink_id=${input%%	*}
+        echo "$sink_id $sink"
+        pactl move-sink-input $sink_id $sink
+    done < <(list_sink_inputs)
+fi
