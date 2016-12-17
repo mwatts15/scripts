@@ -1,8 +1,23 @@
 #!/bin/sh
 
-VGA_CONFIG=${VGA_CONFIG:-$HOME/.vgaconf}
-echo $VGA_CONFIG
-. "`readlink -f $VGA_CONFIG`"
+PROG=`basename $0`
+HOLDER_FILE="$HOME/.cache/vgaon-last-config"
+if [ "$PROG" = 'vgaon' ] ; then
+    VGA_CONFIG="${VGA_CONFIG:-$HOME/.vgaconf}"
+else
+    if [ -s "$HOLDER_FILE" ] ; then
+        LAST_CONFIG="$(cat "$HOLDER_FILE")"
+        if [ -s "$LAST_CONFIG" ] ; then
+            VGA_CONFIG="${LAST_CONFIG}"
+        fi
+    fi
+    if [ ! $VGA_CONFIG ] ; then
+        VGA_CONFIG="$HOME/.vgaconf"
+    fi
+fi
+
+echo -n "$VGA_CONFIG" | tee "$HOLDER_FILE"
+. "`readlink -f "$VGA_CONFIG"`"
 MON=${MON:-LVDS1}
 MODE=${MODE:-1366x768}
 EXTMODE=${EXTMODE:-1024x768}
@@ -10,7 +25,7 @@ EXTMON=${EXTMON:-VGA1}
 POS=${POS:-below}
 
 srun() {
-    sleep 1
+    sleep 0.5
     echo Running %$@%
     $@
 }
@@ -29,6 +44,7 @@ if [ $PROG = 'vgaon' ] ; then
     if [ $? -eq 0 ] ; then
         AFTER_EXT
     fi
+    srun xrandr --output $MON --primary
     srun xrandr --output $MON --mode $MODE
     srun xrandr --output $MON --rotate normal --${POS} $EXTMON
     srun $HOME/.fehbg
@@ -39,5 +55,9 @@ if [ $PROG = 'vgaon' ] ; then
     fi
 else
     srun xrandr --output $EXTMON --off
-    srun $HOME/.fehbg
+    srun "$HOME/.fehbg"
+    type AFTER_OFF > /dev/null 2> /dev/null
+    if [ $? -eq 0 ] ; then
+        AFTER_OFF
+    fi
 fi
