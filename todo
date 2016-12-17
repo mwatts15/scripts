@@ -1,13 +1,13 @@
 #!/usr/bin/env ruby
 # Write/remove a task to do later.
-require 'dmenu_util'
-$SB='"#336699"'
-$SF='"#cccccc"'
-$NB='"#111111"'
-$NF='"#cccccc"'
+require 'dmenu'
+$SB='#336699'
+$SF='#cccccc'
+$NB='#111111'
+$NF='#cccccc'
 $SCREEN_WIDTH=1366
-$FONT_WIDTH=14 #in pixels
-$FONT='"Sazanami Mincho":pixelsize=' + $FONT_WIDTH.to_s
+$FONT_WIDTH=10 #in pixels
+$FONT='Noto Sans Mono CJK JP Regular:pixelsize=' + $FONT_WIDTH.to_s
 
 $COMMAND_SIG = "@"
 $GROUP_SIG = "+"
@@ -25,15 +25,16 @@ def my_dmenu (entries, prompt='todo', height=false, width=$SCREEN_WIDTH)
         height = entries.length
     end
     height = [height, 20].min
-    dmenu(entries, prompt, height, width,
+    Dmenu::dmenu(entries, prompt, height, width,
               $NF,
               $NB,
               $SF,
-              $SB)
+              $SB,
+              $FONT)
 end
 
 $entries = File.open($FILE) do |f|
-    f.lines.to_a.map{|x| x.to_s.chomp}
+    f.each_line.to_a.map{|x| x.to_s.chomp}
 end
 
 def numbered_entries(e)
@@ -91,6 +92,7 @@ def add_or_deleteDM
         if idx >= 0
             $entries.delete_at(idx)
         else
+            task = (Time.now.strftime "%Y-%m-%d") + ' ' + task
             $entries.push(task)
         end
         true
