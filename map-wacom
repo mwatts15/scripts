@@ -1,0 +1,11 @@
+#!/bin/sh
+
+OUTPUT=${1:-LVDS1}
+get_id () {
+    X=$1
+    echo -n $(xsetwacom --list devices | grep $X | cut -f 2 | cut -d' ' -f 2 | head -n 1)
+}
+eraser=$(get_id ERASER)
+stylus=$(get_id STYLUS)
+xsetwacom --set "$eraser" MapToOutput $OUTPUT
+xsetwacom --set "$stylus" MapToOutput $OUTPUT
