@@ -8,9 +8,4 @@ random_string()
 length=$1
 extra_charset=$2
 
-str=$(random_string $length $extra_charset)
-if [ $DMENU_RUN ] ; then
-    xvkbd -no-sync -text "$str"
-else
-    echo $str 
-fi
+random_string $length $extra_charset

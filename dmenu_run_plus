@@ -1,7 +1,18 @@
 #!/bin/sh
+# dmenu_run with some little mods
+typeouts='random-string
+date
+fortune
+'
 
-output=`dmenu_run`
+selection=$(dmenu_path | dmenu "$@")
+echo "$typeouts" | grep -e "${selection%% *}" 2>/dev/null >/dev/null
 
-if [ "$output" ] ; then
-    echo $output | dmenu
+typeout=$?
+
+if [ $typeout -eq 0 ] ; then
+    str=$(echo "$selection" | DMENU_RUN=1 ${SHELL:-"/bin/sh"})
+    echo -n "$str" | xvkbd -no-sync -xsendevent -file - >/dev/null 2>/dev/null
+else
+    echo "$selection" | DMENU_RUN=1 ${SHELL:-"/bin/sh"} &
 fi
