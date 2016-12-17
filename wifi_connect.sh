@@ -35,7 +35,7 @@ while [ $n -lt $limit ] ; do
     $(( n = n+1))
 done
 
-connlist="$(nmcli -f name con list |
+connlist="$(nmcli -f name con |
 tail -n +2  |
 cat $WC_CACHE - | 
 sed -r 's/^[[:space:]]+|[[:space:]]+$//g' |
@@ -60,7 +60,7 @@ while [ $n -lt $limit ] ; do
     nmcli con up id "$c" && message "connected." && break
     connlist="$(echo "$connlist" | grep -v "$c")\n$c"
 
-    $(( n = n+1))
+    n=$((n+1))
 done
 
 connlist="$c\n$connlist"
