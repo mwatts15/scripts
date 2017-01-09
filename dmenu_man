@@ -1,12 +1,11 @@
 #!/bin/sh
 
-export MANSECT=1,3,7
 ASK_SECTION=false
 BG_COLOR=#000000 #solarized light gray
 FG_COLOR=#858900 #solarized green
 SEL_BG_COLOR=$FG_COLOR
 SEL_FG_COLOR=$BG_COLOR
-FONT="Sazanami Mincho:pixelsize=10"
+FONT="Noto Sans Mono CJK JP Regular:pixelsize=10"
 
 my_dmenu ()
 {
@@ -15,13 +14,15 @@ my_dmenu ()
     LANG=en_US.UTF-8 dmenu -p $prompt -nf $FG_COLOR -nb $BG_COLOR -sb $SEL_BG_COLOR -sf $SEL_FG_COLOR -i -l 10 -fn "$FONT"
 }
 
-page_section=`man -k . | my_dmenu "$@" | sed -r 's/^([^ ]+) \(([[:digit:]]+)\).*$/\1 \2/'`
-echo "ps = $page_section"
+page_section=`man -k . | my_dmenu "$@" | sed -r 's/^([^ ]+) \(([^)]+)\).*$/\1 \2/'`
+
 page=${page_section%% *}
 section=${page_section##* }
+echo $page
+echo $section
 
 if [ ! $page ] ; then
     exit
 fi
-echo "section =${section}"
-yelp "man:$page\(${section}\)"
+
+my-term -e man $section $page 
