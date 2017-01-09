@@ -16,6 +16,13 @@ def parse_dict_formatted_output(line)
     line.split("\t")
 end
 
+def my_dmenu(entries, prompt="Select one")
+    dmenu(entries, prompt, false, '100%',
+          '#FEFEFE', '#010101',
+          '#555555', '#eeeeee',
+          "'Noto Sans Mono CJK JP Regular':pixelsize=10")
+end
+
 Open3.popen3(cmd) do |stdin, stdout, stderr, wait_thr|
     exit_status = wait_thr.value.to_i % 255
     puts "es is #{exit_status}"
@@ -26,9 +33,15 @@ Open3.popen3(cmd) do |stdin, stdout, stderr, wait_thr|
     elsif exit_status == 21
         # skip over the notice
         stderr.gets
+        entries = []
         while line = stderr.gets
-            puts line
+            puts "#{line.inspect}"
+            if !(line.nil? || line.empty? || line.match(/^\s+$/))
+                src,num,dict,word = line.chomp.split(/\t/)
+                entries << {:src=>src, :num=>num, :db=>dict, :word=>word}
+            end
         end
+        print entries
     elsif exit_status == 0
         puts "matched"
         # skip over the notice
@@ -46,7 +59,7 @@ Open3.popen3(cmd) do |stdin, stdout, stderr, wait_thr|
                 options[short_name] = [long_name, desc.string]
             end
         end
-        choice = dmenu(options.keys)
-        dmenu(options[choice][1].split("\n"), "definition for #{selection}")
+        choice = my_dmenu(options.keys, "dictionary")
+        my_dmenu(options[choice][1].split("\n"), "definition for #{selection}")
     end
 end
