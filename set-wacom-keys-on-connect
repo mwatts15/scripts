@@ -1,0 +1,17 @@
+#!/bin/sh
+$(import util.sh)
+$(import wacom_util.sh)
+#   2
+#   3
+#   8
+#   9
+#4( 1)5
+#  10
+#  11
+#  12
+#  13
+setkeys () {
+    xsetwacom --set $(wacom_get_device_id PAD) Button 13 "key ctrl"
+}
+die_if_program_doesnt_exist xsetwacom
+on_wacom_status_change setkeys
