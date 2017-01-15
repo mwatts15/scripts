@@ -1,0 +1,9 @@
+#!/bin/sh
+possible_source=$HOME/.local/lib/bash/$1
+if [ -r $possible_source ] ; then
+    echo . $possible_source
+else
+    echo Can\'t recover source. >&2
+    exit 5
+fi
+
