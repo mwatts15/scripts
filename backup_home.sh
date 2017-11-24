@@ -1,10 +1,10 @@
 #!/bin/bash
 
-DEFAULT_DEST_DIR="/media/Seagate Backup Plus Drive"
+DEFAULT_DEST_DIR="/media/$USER/Seagate Backup Plus Drive"
 DEST_DIR="${DEST_DIR:-$DEFAULT_DEST_DIR}"
-BACKUP_CONFIG=backup.config
+BACKUP_CONFIG=$HOME/backup.config
 COLUMNS=80
-GLOBAL_EXCLUDES=backup-excludes
+GLOBAL_EXCLUDES=$HOME/backup-excludes
 
 backup () {
     name=$1
@@ -12,7 +12,7 @@ backup () {
     dry_run=$3
 
     backup_location="${DEST_DIR}/${USER}-${name}.backup"
-    excludes="./${name}_backup_excludes"
+    excludes="$HOME/${name}_backup_excludes"
     dry_run_args=""
     echo "Backups going to $backup_location"
     touch $excludes
@@ -22,7 +22,7 @@ backup () {
         message "dry run"
         dry_run_args="-n -i"
     fi
-    rsync ${dry_run_args} --delete -ax --exclude-from="${GLOBAL_EXCLUDES}" --exclude-from="${excludes}" "${source_location}" "${backup_location}" 2>>rsync-backup-errors >>rsync-out
+    rsync ${dry_run_args} -ax --exclude-from="${GLOBAL_EXCLUDES}" --exclude-from="${excludes}" "${source_location}" "${backup_location}" 2>>rsync-backup-errors >>rsync-out
 }
 
 message()
@@ -45,7 +45,7 @@ proc_opts ()
         key="$1"
         echo $key
         case $key in
-            --dry-run)
+            --dry-run|-n)
                 echo "Setting DRY_RUN"
                 DRY_RUN=TRUE
                 ;;
