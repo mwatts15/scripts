@@ -1,4 +1,3 @@
 #!/bin/zsh
-last_directory=$(cat "$HOME/.last-directory")
-cd "$last_directory"
-exec urxvt $@
+last_directory="$(cat "$HOME/.last-directory")"
+exec urxvt -cd "$last_directory" $@
