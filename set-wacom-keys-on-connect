@@ -12,6 +12,8 @@ $(import wacom_util.sh)
 #  13
 setkeys () {
     xsetwacom --set $(wacom_get_device_id PAD) Button 13 "key ctrl"
+    xsetwacom --set $(wacom_get_device_id PAD) Button 12 "key tab"
+    xsetwacom --set $(wacom_get_device_id TOUCH) Touch off
 }
 die_if_program_doesnt_exist xsetwacom
 on_wacom_status_change setkeys
