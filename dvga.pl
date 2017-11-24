@@ -34,7 +34,7 @@ sub main {
     open my $F, "+<", $LIST;
     my $h = parse($F);
     my @arr = stringify_confs($h);
-    my $choice = show_menu "dmenu", @arr;
+    my $choice = show_menu "my_dmenu", @arr;
     if (defined $choice) {
         my ($key, undef) = split / /, $choice, 2;
         my $conf = $h->{$key}{conf};
