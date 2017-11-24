@@ -41,6 +41,9 @@ cat $WC_CACHE - |
 sed -r 's/^[[:space:]]+|[[:space:]]+$//g' |
 egrep -e '.+' |
 awk '!x[$0]++' -)"
+connlist="$connlist
+@new"
+
 ncons=$(echo "$connlist" | wc -l)
 
 limit=10
@@ -55,13 +58,18 @@ while [ $n -lt $limit ] ; do
     if [ "x$c" = x ] ; then 
         exit 0
     fi
-    message "Attempting to connect to '$c'" & 
+    if [ "$c" = "@new" ] ; then
+        aplist=$(nmcli -f bssid,ssid,signal,bars,chan,security,mode dev wifi 2>/dev/null | tail -n +2)
+        apcount=$(echo "$aplist" | wc -l)
+        c=$(echo "$aplist" | dmenu -p "Which AP?" -l $apcount | cut -f1 -d' ')
+        nmcli dev wifi connect "$c"
+        break
+    else
+        message "Attempting to connect to '$c'" & 
 
-    nmcli con up id "$c" && message "connected." && break
-    connlist="$(echo "$connlist" | grep -v "$c")\n$c"
+        timeout 10 nmcli con up id "$c" && message "connected." && break
+        connlist="$(echo "$connlist" | grep -v "$c")\n$c"
 
-    n=$((n+1))
+        n=$((n+1))
+    fi
 done
-
-connlist="$c\n$connlist"
-echo "$connlist" | awk '!x[$0]++' - > $WC_CACHE
