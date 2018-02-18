@@ -3,7 +3,7 @@ $(import util.sh)
 $(import wacom_util.sh)
 die_if_program_doesnt_exist xsetwacom
 
-OUTPUT=${1:-LVDS1}
+OUTPUT=${1:-LVDS-1}
 
 eraser=$(wacom_get_device_id ERASER)
 stylus=$(wacom_get_device_id STYLUS)
