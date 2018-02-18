@@ -1,0 +1,146 @@
+#!/bin/bash -e
+
+# ep: Expose Ports - a utility to conveniently expose TCP ports on a remote host
+#
+# Kind-of a poor-man's ngrok, which requires you have SSH access to a publicly
+# accessible server that you can bind ports on and which doesn't generate a
+# sub-domain for you
+
+RECORDS=~/.ssh-exposed-ports
+
+normalize_records()
+{
+    tf=$(_mktemp)
+    sort -u $RECORDS | awk 'NF' > $tf
+    cat $tf > $RECORDS
+}
+
+expose() {
+    lport=${1:?No local port provided}
+    rport=${2:-$lport}
+    rhost=${3:-${EP_DEFAULT_HOST:?Please set '$EP_DEFAULT_HOST' or provide a remote host in the "'expose'" command line}}
+    lhost=${4:-127.0.0.1}
+
+    nohup ssh -N -R "$rport":"$lhost":"$lport" "$rhost" >/dev/null 2>/dev/null &
+    pid=$!
+    stat=$?
+    if [ $stat -eq 0 ] ; then
+        echo "$pid,$rhost,$rport,$lhost,$lport" >> $RECORDS
+    fi
+    normalize_records
+}
+
+unexpose() {
+    req_lport=${1:?Please set a port to un-expose}
+    tf=$(_mktemp)
+    killed=1
+    while IFS=, read pid rhost rport lhost lport ; do
+        if [ "$req_lport" = "$lport" ] ; then
+            echo "$pid"
+            kill $pid
+            killed=$?
+            if [ $killed -ne 0 ] ; then
+                break
+            fi
+        else
+            echo "$pid,$rhost,$rport,$lhost,$lport" >> $tf
+        fi
+    done < $RECORDS
+    if [ $killed -eq 0 ] ; then
+        cat $tf > $RECORDS
+        normalize_records
+    fi
+    return $killed
+}
+
+make_query_good(){
+    echo "$@" | sed -e 's/ *= */ = /' -e 's/\band\b/-a/' -e 's/\bor\b/-o/'
+}
+
+list() {
+    query=$(make_query_good "$@")
+    if [ "$DEBUG" ] ; then
+        echo "QUERY: '$query'"  >&2
+    fi
+    normalize_records
+    tf=$(_mktemp)
+    echo "pid,rhost,rport,lhost,lport" > $tf
+    while IFS=, read pid rhost rport lhost lport ; do
+        if [ ! -z "$query" ] ; then
+            if eval "[ $query ]" ; then
+                echo "$pid,$rhost,$rport,$lhost,$lport" >> $tf
+            fi
+        else
+            echo "$pid,$rhost,$rport,$lhost,$lport" >> $tf
+        fi
+    done < $RECORDS
+    column -s, -t $tf
+}
+
+prune() {
+    tf=$(_mktemp)
+    while IFS=, read pid rhost rport lhost lport ; do
+        if ps $pid >/dev/null ; then
+            echo "$pid,$rhost,$rport,$lhost,$lport" >> $tf
+        else
+            echo "Removing: $pid,$rhost,$rport,$lhost,$lport" >&2
+        fi
+    done < $RECORDS
+    cat $tf > $RECORDS
+}
+
+TEMP_FILES=$(mktemp)
+
+_mktemp() {
+    res=$(mktemp -t ep-temp-XXXXXXXXX)
+    echo $res >> $TEMP_FILES
+    echo $res
+}
+
+_clean_temps() {
+    while read f; do
+        rm $f
+    done < $TEMP_FILES
+    rm $TEMP_FILES
+}
+
+trap _clean_temps EXIT
+
+case $1 in
+expose)
+    shift
+    expose $@
+;;
+unexpose)
+    shift
+    unexpose $@
+;;
+list)
+    shift
+    list $@
+;;
+prune)
+    shift
+    prune
+;;
+*)
+    cat <<END
+Usage: ep {expose|unexpose|list|prune} [arguments]...
+Expose TCP ports on a locally accessible host from a remote host
+
+expose LOCAL_PORT [REMOTE_PORT [REMOTE_HOST [LOCAL_HOST]]] # expose a port
+     LOCAL_PORT: The destination port to forward to
+    REMOTE_PORT: The remote port to accept connections on (defaults to local_port)
+    REMOTE_HOST: The remote host which accepts connections on behalf of the destination host (defaults to EP_DEFAULT_HOST="$EP_DEFAULT_HOST")
+     LOCAL_HOST: The destination host to forward connections to (defaults to "127.0.0.1")
+
+unexpose LOCAL_PORT # un-expose a port
+    LOCAL_PORT:  The port to un-expose
+
+list [QUERY...] # list exposed ports
+    QUERY: Selectors for the list. The rest of the command line is the query (defaults to listing all entries)
+
+prune # clear the list of ports which are no-longer exposed
+END
+;;
+esac
