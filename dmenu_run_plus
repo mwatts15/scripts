@@ -5,14 +5,22 @@ date
 fortune
 '
 
+clipboards='random-string
+'
+
 selection=$(dmenu_path | dmenu "$@")
 echo "$typeouts" | grep -e "${selection%% *}" 2>/dev/null >/dev/null
 
 typeout=$?
 
+echo "$clipboards" | grep -e "${selection%% *}" 2>/dev/null >/dev/null
+clipit=$?
+
+str=$(echo "$selection" | DMENU_RUN=1 ${SHELL:-"/bin/sh"})
 if [ $typeout -eq 0 ] ; then
-    str=$(echo "$selection" | DMENU_RUN=1 ${SHELL:-"/bin/sh"})
     echo -n "$str" | xvkbd -no-sync -xsendevent -file - >/dev/null 2>/dev/null
-else
-    echo "$selection" | DMENU_RUN=1 ${SHELL:-"/bin/sh"} &
+fi
+
+if [ $clipit -eq 0 ] ; then
+    echo -n "$str" | xclip -selection clipboard -i
 fi
