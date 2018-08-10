@@ -53,6 +53,11 @@ unexpose() {
     return $killed
 }
 
+reexpose() {
+    unexpose $@
+    expose $@
+}
+
 make_query_good(){
     echo "$@" | sed -e 's/ *= */ = /' -e 's/\band\b/-a/' -e 's/\bor\b/-o/'
 }
@@ -115,6 +120,10 @@ unexpose)
     shift
     unexpose $@
 ;;
+reexpose)
+    shift
+    reexpose $@
+;;
 list)
     shift
     list $@
@@ -136,6 +145,12 @@ expose LOCAL_PORT [REMOTE_PORT [REMOTE_HOST [LOCAL_HOST]]] # expose a port
 
 unexpose LOCAL_PORT # un-expose a port
     LOCAL_PORT:  The port to un-expose
+
+reexpose LOCAL_PORT [REMOTE_PORT [REMOTE_HOST [LOCAL_HOST]]] # un-expose, then expose a port
+    LOCAL_PORT:  The port to un-expose
+    REMOTE_PORT: The remote port to accept connections on (defaults to local_port)
+    REMOTE_HOST: The remote host which accepts connections on behalf of the destination host (defaults to EP_DEFAULT_HOST="$EP_DEFAULT_HOST")
+     LOCAL_HOST: The destination host to forward connections to (defaults to "127.0.0.1")
 
 list [QUERY...] # list exposed ports
     QUERY: Selectors for the list. The rest of the command line is the query (defaults to listing all entries)
