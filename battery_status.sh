@@ -15,8 +15,19 @@ thresh_time=1 # At most, one event per second from acpi_listen
 _notify_15=0  # Status variable for whether we've notified about battery charge 15%
 
 update_status () {
-    charge_now=$(cat /sys/class/power_supply/BAT0/charge_now)
-    charge_full=$(cat /sys/class/power_supply/BAT0/charge_full)
+    if [ -f /sys/class/power_supply/BAT0/charge_now ] ; then 
+        charge_now_file=/sys/class/power_supply/BAT0/charge_now
+        charge_full_file=/sys/class/power_supply/BAT0/charge_full
+    elif [ -f /sys/class/power_supply/BAT0/energy_now ] ; then 
+        charge_now_file=/sys/class/power_supply/BAT0/energy_now
+        charge_full_file=/sys/class/power_supply/BAT0/energy_full
+    else
+        echo "Could not find the charge file"
+        return 1
+    fi
+
+    charge_now=$(cat $charge_now_file)
+    charge_full=$(cat $charge_full_file)
     charge_perc=$(echo "scale=0; 100 * $charge_now / $charge_full" | bc -lq)
     ac_on=$(cat /sys/class/power_supply/AC/online)
     status='<fc=#ff0000>BAT</fc>'
