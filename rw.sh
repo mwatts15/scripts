@@ -62,6 +62,5 @@ if [ x$WP_TITLE_OVERLAY == xTRUE ] ; then
 else
     cp "$wpfile" $HOME/.rwbg
 fi
-echo $wpfile
 
 $WP_CMD $HOME/.rwbg
