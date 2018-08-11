@@ -1,0 +1,4 @@
+#!/usr/bin/env ruby
+
+$FONT="'Noto Sans Mono CJK JP Regular':pixelsize=10"
+print `dmenu -l 10 -fn #{$FONT} #{ARGV.join(" ")}`.chomp
