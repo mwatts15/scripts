@@ -7,6 +7,7 @@ use strict;
 use Env;
 use CStore qw/parse/;
 use Dmenu qw/show_menu/;
+use File::Basename;
 
 sub stringify_confs {
     my $h = shift;

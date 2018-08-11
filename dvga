@@ -1,2 +1,4 @@
 #!/bin/sh
-PERLLIB=$HOME/.local/lib/perl perl $HOME/bin/dvga.pl
+SCRIPTDIR="$(readlink -f "$(dirname "$0")")"
+export DVGA_VGAON=vgaon
+PERLLIB=$HOME/.local/lib/perl perl $SCRIPTDIR/dvga.pl
