@@ -21,7 +21,7 @@ my @unalias_list = ();
 my @actions_list = (
     "add" =>
     {
-        arg=>"PROJECT_NAME PROJECT_DIRECTORY", 
+        arg=>"PROJECT_NAME PROJECT_DIRECTORY",
         desc=>"Add an entry to the project list",
         act=>sub {
             my ($pname, $dir) = @_;
@@ -38,19 +38,19 @@ my @actions_list = (
             &add_entry($pname, $dir);
         }
     },
-    "add-remote" => 
+    "add-remote" =>
     {
-        arg=>"PROJECT_NAME REMOTE_DIRECTORY", 
-        desc=>"Add the remote directory (e.g., upstream git) for the project", 
+        arg=>"PROJECT_NAME REMOTE_DIRECTORY",
+        desc=>"Add the remote directory (e.g., upstream git) for the project",
         act=>\&add_remote
     },
-    "put-remote" => 
+    "put-remote" =>
     {
         arg=>"PROJECT_NAME FILE_TO_TRANSFER",
         desc=>"Copy a file from the project directory to the configured remote directory over SSH",
         act=> \&scp_to_remote
     },
-    "rm" => 
+    "rm" =>
     {
         arg=> "PROJECT_NAME",
         desc=>"Remove the project entry",
@@ -87,7 +87,7 @@ sub process_arguments
     return @ARGV;
 }
 
-sub start 
+sub start
 {
     &process_arguments;
     open $TGF, "+<", $TARGETS;
@@ -175,7 +175,7 @@ sub save_targets_file
     for my $pname (keys %project_hash)
     {
         print $TGF "$pname";
-        for my $key (keys $project_hash{$pname})
+        for my $key (keys %{ $project_hash{$pname} })
         {
             print $TGF ":$key:$project_hash{$pname}{$key}";
         }
@@ -276,7 +276,7 @@ sub do_action
 {
     my $action = shift @_;
     my @args = map {&sanitize_value($_)} @_;
-    
+
     my $action = $actions{$action};
     if (defined $action)
     {
@@ -298,8 +298,8 @@ sub print_help
 
     my @help_data = ();
     print "Usage: " . basename($0) . " COMMAND\n";
-    print "Manage project data.\n"; 
-    print "\n"; 
+    print "Manage project data.\n";
+    print "\n";
     print "Available commands:\n";
     while (my @t = $it->())
     {
