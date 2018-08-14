@@ -36,7 +36,7 @@ fi
 
 PROG=`basename $0`
 
-if [ $PROG = 'vgaon' ] ; then
+if [ $PROG = 'vgaon' -o $PROG = 'vgareset' ] ; then
     srun xrandr --output $EXTMON --off
     srun xrandr --output $EXTMON --mode $EXTMODE
     srun xrandr --output $EXTMON --rotate normal --preferred 
