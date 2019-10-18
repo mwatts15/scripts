@@ -1,0 +1,6 @@
+#!/bin/bash
+tempdir="$(mktemp -d)"
+fname=$tempdir/chip.png
+scrot -s "$fname"
+xclip -selection clipboard -t image/png "$fname"
+#rm -rf $tempdir
