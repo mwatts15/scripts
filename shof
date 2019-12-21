@@ -1,0 +1,8 @@
+#!/bin/sh
+
+find "$@" -type f | while read f ; do 
+    echo 
+    echo $f
+    echo "$f" | sed s/./-/g
+    cat -n $f
+done | less
