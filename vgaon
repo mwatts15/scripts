@@ -20,8 +20,13 @@ echo -n "$VGA_CONFIG" | tee "$HOLDER_FILE"
 . "`readlink -f "$VGA_CONFIG"`"
 MON=${MON:-LVDS1}
 MODE=${MODE:-1366x768}
-EXTMODE=${EXTMODE:-1024x768}
-EXTMON=${EXTMON:-VGA1}
+if [ "$PROG" = hdmioff ] ; then
+    EXTMODE=${EXTMODE:-1600x900}
+    EXTMON=${EXTMON:-"HDMI-1"}
+else
+    EXTMODE=${EXTMODE:-1024x768}
+    EXTMON=${EXTMON:-VGA-1}
+fi
 POS=${POS:-below}
 
 srun() {
