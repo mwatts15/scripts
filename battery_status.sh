@@ -2,8 +2,9 @@
 
 OUT="/tmp/${USER}-battery-status-pipe"
 MYPID=$$
-PIPESDIR=$(mktemp -d)
+PIPESDIR=$(mktemp -d --suffix="-battery-status")
 ETPIDFILE=$(mktemp -p $PIPESDIR)
+LAST_UPDATE_FILE="$PIPESDIR/last_up"
 
 if [ ! -e $OUT -o ! -p $OUT  ] ; then
     rm -f $OUT
@@ -14,7 +15,25 @@ thresh_time=1 # At most, one event per second from acpi_listen
 
 _notify_15=0  # Status variable for whether we've notified about battery charge 15%
 
+should_update () {
+    if [ -f "$LAST_UPDATE_FILE" ] ; then
+        last_update=$(cat "$LAST_UPDATE_FILE")
+    else
+        last_update=0
+    fi
+    now=$(date +'%s')
+    if [ $(( last_update + thresh_time )) -lt $now ] ; then
+        return 0
+    fi
+    return 1
+}
+
+pass () {
+   return 0
+}
+
 update_status () {
+    should_update || return 0
     if [ -f /sys/class/power_supply/BAT0/charge_now ] ; then 
         charge_now_file=/sys/class/power_supply/BAT0/charge_now
         charge_full_file=/sys/class/power_supply/BAT0/charge_full
@@ -46,6 +65,7 @@ update_status () {
         charge_perc="<fc=#ff0000>$charge_perc</fc>"
     fi
     printf "%3s %3s%%\n" "${status}" "${charge_perc}" > $OUT
+    date +'%s' > "$LAST_UPDATE_FILE"
 }
 
 start_acpi_events () {
@@ -55,27 +75,40 @@ start_acpi_events () {
     $(mkfifo $p1)
     $(mkfifo $p2)
     acpi_listen >$p1 &
-    echo $! > $ETPIDFILE
+    echo $! >> $ETPIDFILE
     egrep --line-buffered '^(battery|ac_adapter)' >$p2 <$p1 &
     echo $! >> $ETPIDFILE
     while read f ; do 
-        update_status
+        update_status || pass
     done <$p2
 }
 
+start_file_events () {
+    while [ 1 ] ; do
+        inotifywait -e open "$OUT" || pass
+        update_status || pass
+    done
+}
+
 start_acpi_events &
+echo $! >> $ETPIDFILE
+
+start_file_events &
+echo $! >> $ETPIDFILE
 
 killem () {
+    echo "${0} KILLING..."
     while read pid ; do 
         if [ $pid ] ; then
-            kill -9 $pid || echo "kill error $? for $pid" >&2
+            kill -9 $pid 2> /dev/null || echo "kill error $? for $pid" >&2
         fi
     done < $ETPIDFILE
     rm -rf $PIPESDIR || echo "Failed to clean up the pipes directory: $PIPESDIR"
-    pkill -9 -P $MYPID || echo "pkill error $?" >&2
+    pkill -9 -P $MYPID 2> /dev/null || echo "pkill error $?" >&2
 }
 
-trap killem 0 1 2
+trap killem 0 1 2 3 15 19
+
 update_status
 while [ 1 ] ; do
     sleep 30
