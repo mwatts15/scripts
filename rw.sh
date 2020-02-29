@@ -2,7 +2,7 @@
 DISPLAY=:0
 export DISPLAY
 
-WP_CONFIG=$HOME/.rwcfg
+WP_CONFIG=${WP_CONFIG:-"$HOME/.rwcfg"}
 
 WP_DIR=$HOME/pictures/wp
 WP_PATH=.
